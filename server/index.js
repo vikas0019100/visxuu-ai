@@ -1,0 +1,502 @@
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const NodeCache = require('node-cache');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
+const upload = multer({ 
+  dest: 'uploads/',
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
+
+const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
+
+const sessions = new Map();
+const conversationHistory = new Map();
+const modelProviders = {
+  'gpt-4o': { provider: 'openai', model: 'gpt-4o', speed: 'fast', intelligence: 'high', context: '128k' },
+  'gpt-4o-mini': { provider: 'openai', model: 'gpt-4o-mini', speed: 'ultra', intelligence: 'high', context: '128k' },
+  'gpt-4-turbo': { provider: 'openai', model: 'gpt-4-turbo-preview', speed: 'fast', intelligence: 'high', context: '128k' },
+  'claude-3.5-sonnet': { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', speed: 'fast', intelligence: 'ultra', context: '200k' },
+  'claude-3-opus': { provider: 'anthropic', model: 'claude-3-opus-20240229', speed: 'medium', intelligence: 'ultra', context: '200k' },
+  'claude-3-haiku': { provider: 'anthropic', model: 'claude-3-haiku-20240307', speed: 'ultra', intelligence: 'high', context: '200k' },
+  'gemini-1.5-pro': { provider: 'google', model: 'gemini-1.5-pro', speed: 'fast', intelligence: 'high', context: '1M' },
+  'gemini-1.5-flash': { provider: 'google', model: 'gemini-1.5-flash', speed: 'ultra', intelligence: 'high', context: '1M' },
+  'llama-3.1-70b': { provider: 'groq', model: 'llama-3.1-70b-versatile', speed: 'ultra', intelligence: 'high', context: '128k' },
+  'llama-3.1-8b': { provider: 'groq', model: 'llama-3.1-8b-instant', speed: 'ultra', intelligence: 'medium', context: '8k' },
+  'mixtral-8x7b': { provider: 'groq', model: 'mixtral-8x7b-32768', speed: 'fast', intelligence: 'high', context: '32k' },
+};
+
+const agentPrompts = {
+  analyst: `You are an expert data analyst AI agent. Your role is to:
+1. Analyze data patterns and trends
+2. Provide statistical insights
+3. Create visualizations descriptions
+4. Identify anomalies and outliers
+5. Generate actionable recommendations
+Always structure your analysis with clear sections: Summary, Key Findings, Trends, and Recommendations.`,
+
+  coder: `You are an expert software engineer AI agent. Your role is to:
+1. Write clean, efficient, production-ready code
+2. Debug and optimize existing code
+3. Suggest best practices and design patterns
+4. Explain complex code concepts
+5. Provide multiple solutions when applicable
+Always include comments, error handling, and test cases in your code.`,
+
+  researcher: `You are an expert research assistant AI agent. Your role is to:
+1. Conduct thorough research on topics
+2. Synthesize information from multiple sources
+3. Provide citations and references
+4. Identify knowledge gaps
+5. Present findings in a structured format
+Always verify facts and provide balanced perspectives.`,
+
+  creative: `You are a creative AI agent specializing in:
+1. Storytelling and narrative development
+2. Creative writing (poems, scripts, essays)
+3. Marketing copy and branding
+4. Brainstorming innovative ideas
+5. Artistic concept development
+Think outside the box and inspire creativity.`,
+
+  math: `You are a mathematics AI agent specializing in:
+1. Step-by-step problem solving
+2. Mathematical proofs and derivations
+3. Statistical analysis
+4. Calculus, algebra, and geometry
+5. Real-world applications of math
+Always show your work and explain each step clearly.`
+};
+
+async function callOpenAI(messages, model, apiKey) {
+  const OpenAI = require('openai');
+  const client = new OpenAI({ apiKey });
+  
+  const completion = await client.chat.completions.create({
+    model: model,
+    messages: messages,
+    temperature: 0.7,
+    max_tokens: 4096,
+    top_p: 0.9,
+    frequency_penalty: 0.3,
+    presence_penalty: 0.3,
+    stream: true,
+  });
+
+  let response = '';
+  for await (const chunk of completion) {
+    const delta = chunk.choices[0]?.delta?.content || '';
+    response += delta;
+  }
+  return response;
+}
+
+async function callAnthropic(messages, model, apiKey) {
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey });
+  
+  const systemMsg = messages.find(m => m.role === 'system');
+  const chatMessages = messages.filter(m => m.role !== 'system');
+  
+  const msg = await client.messages.create({
+    model: model,
+    max_tokens: 4096,
+    system: systemMsg?.content || agentPrompts.analyst,
+    messages: chatMessages,
+    temperature: 0.7,
+    top_p: 0.9,
+  });
+  
+  return msg.content[0]?.text || '';
+}
+
+async function callGoogle(messages, model, apiKey) {
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const gemini = genAI.getGenerativeModel({ 
+    model: model,
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxOutputTokens: 4096,
+    }
+  });
+  
+  const systemMsg = messages.find(m => m.role === 'system');
+  const chatMessages = messages.filter(m => m.role !== 'system');
+  
+  let prompt = systemMsg ? `${systemMsg.content}\n\n` : '';
+  chatMessages.forEach(m => {
+    prompt += `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}\n`;
+  });
+  prompt += 'Assistant:';
+  
+  const result = await gemini.generateContent(prompt);
+  return result.response.text();
+}
+
+async function callGroq(messages, model, apiKey) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 4096,
+      top_p: 0.9,
+      stream: false,
+    }),
+  });
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function processAIRequest(messages, model, apiKey, agentType = null) {
+  const provider = modelProviders[model];
+  if (!provider) throw new Error('Unknown model');
+  
+  let processedMessages = messages;
+  if (agentType && agentPrompts[agentType]) {
+    processedMessages = [
+      { role: 'system', content: agentPrompts[agentType] },
+      ...messages.filter(m => m.role !== 'system')
+    ];
+  }
+  
+  const startTime = Date.now();
+  
+  let response;
+  switch (provider.provider) {
+    case 'openai':
+      response = await callOpenAI(processedMessages, provider.model, apiKey);
+      break;
+    case 'anthropic':
+      response = await callAnthropic(processedMessages, provider.model, apiKey);
+      break;
+    case 'google':
+      response = await callGoogle(processedMessages, provider.model, apiKey);
+      break;
+    case 'groq':
+      response = await callGroq(processedMessages, provider.model, apiKey);
+      break;
+    default:
+      throw new Error('Unsupported provider');
+  }
+  
+  const latency = Date.now() - startTime;
+  
+  return {
+    response,
+    latency,
+    model: provider.model,
+    speed: provider.speed,
+    intelligence: provider.intelligence,
+    context: provider.context,
+  };
+}
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { messages, model = 'gpt-4o-mini', apiKey, sessionId, agentType = null } = req.body;
+    
+    if (!messages || !messages.length) {
+      return res.status(400).json({ error: 'Messages required' });
+    }
+    
+    if (!apiKey) {
+      return res.status(401).json({ error: 'API key required' });
+    }
+    
+    const cacheKey = `${model}:${JSON.stringify(messages).slice(0, 200)}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({ ...cached, fromCache: true });
+    }
+    
+    const result = await processAIRequest(messages, model, apiKey, agentType);
+    
+    if (sessionId) {
+      const history = conversationHistory.get(sessionId) || [];
+      history.push(...messages, { role: 'assistant', content: result.response });
+      if (history.length > 50) history.splice(0, history.length - 50);
+      conversationHistory.set(sessionId, history);
+    }
+    
+    cache.set(cacheKey, result);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/chat/stream', async (req, res) => {
+  try {
+    const { messages, model = 'gpt-4o-mini', apiKey, agentType = null } = req.body;
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    const provider = modelProviders[model];
+    if (!provider) {
+      res.write(`data: ${JSON.stringify({ error: 'Unknown model' })}\n\n`);
+      return res.end();
+    }
+    
+    if (provider.provider === 'openai') {
+      const OpenAI = require('openai');
+      const client = new OpenAI({ apiKey });
+      
+      let processedMessages = messages;
+      if (agentType && agentPrompts[agentType]) {
+        processedMessages = [
+          { role: 'system', content: agentPrompts[agentType] },
+          ...messages.filter(m => m.role !== 'system')
+        ];
+      }
+      
+      const completion = await client.chat.completions.create({
+        model: provider.model,
+        messages: processedMessages,
+        temperature: 0.7,
+        max_tokens: 4096,
+        stream: true,
+      });
+      
+      for await (const chunk of completion) {
+        const delta = chunk.choices[0]?.delta?.content || '';
+        if (delta) {
+          res.write(`data: ${JSON.stringify({ content: delta, done: false })}\n\n`);
+        }
+      }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    } else {
+      const result = await processAIRequest(messages, model, apiKey, agentType);
+      res.write(`data: ${JSON.stringify({ content: result.response, done: true })}\n\n`);
+    }
+    
+    res.end();
+  } catch (error) {
+    res.write(`data: ${JSON.stringify({ error: error.message, done: true })}\n\n`);
+    res.end();
+  }
+});
+
+app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
+  try {
+    const { prompt = 'Describe this image in detail', model = 'gpt-4o', apiKey } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file required' });
+    }
+    
+    const imageBuffer = fs.readFileSync(req.file.path);
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = req.file.mimetype;
+    
+    const provider = modelProviders[model];
+    if (!provider) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Unknown model' });
+    }
+    
+    let response;
+    if (provider.provider === 'openai') {
+      const OpenAI = require('openai');
+      const client = new OpenAI({ apiKey });
+      
+      const completion = await client.chat.completions.create({
+        model: provider.model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+            ],
+          },
+        ],
+        max_tokens: 1000,
+      });
+      
+      response = completion.choices[0]?.message?.content || '';
+    } else if (provider.provider === 'google') {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const gemini = genAI.getGenerativeModel({ model: provider.model });
+      
+      const result = await gemini.generateContent([
+        prompt,
+        { inlineData: { mimeType: mimeType, data: base64Image } },
+      ]);
+      
+      response = result.response.text();
+    } else {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Image analysis only supported for OpenAI and Google models' });
+    }
+    
+    fs.unlinkSync(req.file.path);
+    
+    res.json({ response, model: provider.model });
+  } catch (error) {
+    console.error('Image analysis error:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Audio file required' });
+    }
+    
+    const OpenAI = require('openai');
+    const client = new OpenAI({ apiKey });
+    
+    const transcription = await client.audio.transcriptions.create({
+      file: fs.createReadStream(req.file.path),
+      model: 'whisper-1',
+    });
+    
+    fs.unlinkSync(req.file.path);
+    
+    res.json({ text: transcription.text });
+  } catch (error) {
+    console.error('Transcription error:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/synthesize', async (req, res) => {
+  try {
+    const { text, apiKey, voice = 'alloy' } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ error: 'Text required' });
+    }
+    
+    const OpenAI = require('openai');
+    const client = new OpenAI({ apiKey });
+    
+    const mp3 = await client.audio.speech.create({
+      model: 'tts-1',
+      voice: voice,
+      input: text,
+    });
+    
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Synthesis error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/session', (req, res) => {
+  const { create = true } = req.body;
+  
+  if (!create) {
+    return res.json({ sessionId: null });
+  }
+  
+  const sessionId = uuidv4();
+  sessions.set(sessionId, {
+    id: sessionId,
+    createdAt: new Date().toISOString(),
+    messages: [],
+  });
+  conversationHistory.set(sessionId, []);
+  
+  res.json({ sessionId });
+});
+
+app.get('/api/models', (req, res) => {
+  res.json({
+    models: Object.entries(modelProviders).map(([key, val]) => ({
+      id: key,
+      provider: val.provider,
+      model: val.model,
+      speed: val.speed,
+      intelligence: val.intelligence,
+      context: val.context,
+    })),
+    agents: Object.keys(agentPrompts).map(key => ({
+      id: key,
+      name: key.charAt(0).toUpperCase() + key.slice(1),
+      prompt: agentPrompts[key].split('\n')[1]?.trim() || key,
+    }))
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    activeSessions: sessions.size,
+    cachedItems: cache.keys().length,
+  });
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+});
+
+// Serve React built assets in production
+const distPath = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
+
+// SPA fallback - serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+  }
+});
+
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads', { recursive: true });
+}
+
+const server = app.listen(PORT, HOST, () => {
+  const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
+  console.log(`\n🚀 VISXUU AI Server running on http://${displayHost}:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    console.log(`🌐 Accessible on your network via your machine's IP address`);
+  }
+  console.log(`📊 Multi-model AI engine with ${Object.keys(modelProviders).length} models`);
+  console.log(`🤖 ${Object.keys(agentPrompts).length} AI agents ready`);
+  console.log(`⚡ Features: Chat, Vision, Voice, Code, Analysis, Translation, Agents\n`);
+});

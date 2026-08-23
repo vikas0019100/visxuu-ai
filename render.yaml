@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: visxuu-ai
+    env: node
+    plan: free
+    buildCommand: npm install && cd client && npm install && npm run build
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 3001
+    autoDeploy: true
+    healthCheckPath: /api/health

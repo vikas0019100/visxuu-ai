@@ -1,0 +1,30 @@
+{
+  "name": "visxuu-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VISXUU AI - Beyond Intelligence. Advanced multi-model AI platform.",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "install:all": "npm install && cd client && npm install",
+    "start": "node server/index.js",
+    "deploy:render": "cd client && npm run build",
+    "test": "node -e \"console.log('Server running...')\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0",
+    "openai": "^4.20.0",
+    "@anthropic-ai/sdk": "^0.10.0",
+    "@google/generative-ai": "^0.2.0",
+    "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
