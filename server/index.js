@@ -244,14 +244,21 @@ function generateLicenseKey(email, plan) {
 
 function validateLicense(key) {
   const license = licenseStore.get(key);
-  if (!license) return { valid: false, reason: 'Invalid license key' };
-  if (!license.active) return { valid: false, reason: 'License deactivated' };
-  if (new Date(license.expiry) < new Date()) {
-    license.active = false;
-    return { valid: false, reason: 'License expired' };
+  if (!license) return { valid: false, reason: 'Invalid license key', isFirstTime: true };
+  if (!license.active) {
+    return { valid: false, reason: 'License expired', isFirstTime: false, wasActive: true };
   }
-  return { valid: true, license };
+  return { valid: true, license, isFirstTime: false };
 }
+
+app.get('/api/pro/status', (req, res) => {
+  const key = req.headers['x-license-key'];
+  if (!key) {
+    return res.json({ active: false, isFirstTime: true, reason: 'No license key provided' });
+  }
+  const result = validateLicense(key);
+  res.json({ active: result.valid, isFirstTime: result.isFirstTime, ...result });
+});
 
 // Admin middleware
 function requireAdmin(req, res, next) {

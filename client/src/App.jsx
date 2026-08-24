@@ -112,7 +112,11 @@ function App() {
   const checkProStatus = async () => {
     try {
       const key = localStorage.getItem('visxuu_license_key');
-      if (!key) return;
+      if (!key) {
+        // No license = first time user, show only ₹5 plan
+        setPlans(prev => prev.filter(p => p.id === 'monthly'));
+        return;
+      }
       const res = await fetch('/api/pro/status', {
         headers: { 'X-License-Key': key }
       });
@@ -120,6 +124,12 @@ function App() {
       if (data.active) {
         setIsPro(true);
         setProStatus(data);
+      } else if (data.isFirstTime === false && data.wasActive) {
+        // User had PRO before, expired now - show both plans
+        setPlans(prev => prev);
+      } else {
+        // First time user or never had PRO - show only ₹5
+        setPlans(prev => prev.filter(p => p.id === 'monthly'));
       }
     } catch (e) {
       console.error('Failed to check pro status', e);
