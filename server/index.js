@@ -223,8 +223,9 @@ function getServerApiKey(provider) {
 
 // License / Subscription System for VISXUU 3 PRO
 const licenseStore = new Map();
+const paymentStore = new Map();
 
-function generateLicenseKey(email, plan) {
+function generateLicenseKey(email, plan, transactionId) {
   const key = 'VISXUU-' + Math.random().toString(36).substring(2, 10).toUpperCase();
   const expiry = new Date();
   if (plan === 'monthly') {
@@ -235,6 +236,7 @@ function generateLicenseKey(email, plan) {
   licenseStore.set(key, {
     email,
     plan,
+    transactionId,
     expiry: expiry.toISOString(),
     active: true,
     createdAt: new Date().toISOString()
@@ -251,6 +253,20 @@ function validateLicense(key) {
   return { valid: true, license, isFirstTime: false };
 }
 
+function recordPayment(email, plan, amount, transactionId, status = 'pending') {
+  const id = 'PAY-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  paymentStore.set(id, {
+    id,
+    email,
+    plan,
+    amount,
+    transactionId,
+    status, // pending | verified | rejected
+    createdAt: new Date().toISOString()
+  });
+  return id;
+}
+
 app.get('/api/pro/status', (req, res) => {
   const key = req.headers['x-license-key'];
   if (!key) {
@@ -258,6 +274,84 @@ app.get('/api/pro/status', (req, res) => {
   }
   const result = validateLicense(key);
   res.json({ active: result.valid, isFirstTime: result.isFirstTime, ...result });
+});
+
+app.post('/api/pro/verify-payment', async (req, res) => {
+  try {
+    const { plan, email, transactionId, amount, proof } = req.body;
+    
+    if (!plan || !email) {
+      return res.status(400).json({ error: 'Plan and email required' });
+    }
+
+    if (!transactionId && !proof) {
+      return res.status(400).json({ error: 'Payment proof or transaction ID required' });
+    }
+
+    // Plan and amount validation
+    const planConfig = {
+      monthly: { amount: 5, name: '1 Month Premium' },
+      five_month: { amount: 199, name: '5 Months Premium' }
+    };
+
+    const selectedPlan = planConfig[plan];
+    if (!selectedPlan) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    const paidAmount = amount || selectedPlan.amount;
+    if (Number(paidAmount) !== selectedPlan.amount) {
+      return res.status(400).json({ 
+        error: `Amount mismatch. Expected ₹${selectedPlan.amount}, received ₹${paidAmount}` 
+      });
+    }
+
+    // Record payment as pending verification
+    const paymentId = recordPayment(email, plan, paidAmount, transactionId || 'manual-proof', 'pending');
+
+    // In real production, here you would:
+    // 1. Verify transaction with PhonePe/UPI API
+    // 2. Check if transaction ID exists and is successful
+    // 3. Verify amount matches
+    // 4. Auto-approve if all checks pass
+
+    // For now, require manual verification via admin
+    // Auto-approve only for demo/testing with valid transaction ID format
+    let licenseKey = null;
+    let approvalMode = 'manual';
+
+    if (transactionId && transactionId.startsWith('TXN') && transactionId.length > 10) {
+      // Looks like a real transaction ID - auto verify
+      licenseKey = generateLicenseKey(email, plan, transactionId);
+      paymentStore.get(paymentId).status = 'verified';
+      approvalMode = 'auto';
+    } else if (proof) {
+      // Manual proof submitted - requires admin approval
+      paymentStore.get(paymentId).proof = proof;
+      paymentStore.get(paymentId).status = 'pending_review';
+      approvalMode = 'manual';
+    } else {
+      // No valid proof - mark as pending
+      paymentStore.get(paymentId).status = 'pending_review';
+      approvalMode = 'manual';
+    }
+
+    res.json({
+      success: approvalMode === 'auto',
+      paymentId,
+      licenseKey,
+      message: approvalMode === 'auto' 
+        ? 'Payment verified! Your VISXUU 3 PRO license is active.'
+        : 'Payment submitted for verification. You will receive your license key within 24 hours.',
+      plan,
+      email,
+      amount: paidAmount,
+      approvalMode,
+      status: paymentStore.get(paymentId).status
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Admin middleware

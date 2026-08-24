@@ -91,6 +91,10 @@ function App() {
   const [selectedPlan, setSelectedPlan] = useState('five_month')
   const [plans, setPlans] = useState([])
   const [proStatus, setProStatus] = useState(null)
+  const [paymentStatus, setPaymentStatus] = useState(null)
+  const [paymentProof, setPaymentProof] = useState(null)
+  const [transactionId, setTransactionId] = useState('')
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
 
   useEffect(() => {
     const sid = uuidv4();
@@ -135,25 +139,45 @@ function App() {
   }
 
   const handlePayment = async (plan) => {
+    setIsSubmittingPayment(true);
     try {
+      const formData = new FormData();
+      formData.append('plan', plan);
+      formData.append('email', 'user@visxuu.ai');
+      formData.append('transactionId', transactionId || '');
+      formData.append('amount', plan === 'monthly' ? '5' : '199');
+      
+      if (paymentProof) {
+        formData.append('proof', paymentProof);
+      }
+
       const res = await fetch('/api/pro/verify-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan,
-          email: 'user@visxuu.ai',
-          transactionId: 'DEMO-' + Date.now()
-        })
+        body: formData,
       });
+      
       const data = await res.json();
+      
       if (data.success) {
         localStorage.setItem('visxuu_license_key', data.licenseKey);
         setIsPro(true);
         setShowProModal(false);
+        setPaymentStatus(null);
+        setTransactionId('');
+        setPaymentProof(null);
         toast.success('VISXUU 3 PRO activated!');
+      } else {
+        setPaymentStatus(data);
+        if (data.status === 'pending_review') {
+          toast.success('Payment submitted! Waiting for verification...');
+        } else {
+          toast.error(data.error || 'Payment verification failed');
+        }
       }
     } catch (e) {
       toast.error('Payment failed');
+    } finally {
+      setIsSubmittingPayment(false);
     }
   }
 
@@ -730,6 +754,23 @@ function App() {
                 <p className="text-gray-400">Unlock the full power of VISXUU AI</p>
               </div>
 
+              {/* Payment Status Message */}
+              {paymentStatus && (
+                <div className={`mb-6 p-4 rounded-xl ${
+                  paymentStatus.status === 'verified' 
+                    ? 'bg-green-500/20 border border-green-500/50' 
+                    : paymentStatus.status === 'pending_review'
+                    ? 'bg-yellow-500/20 border border-yellow-500/50'
+                    : 'bg-red-500/20 border border-red-500/50'
+                }`}>
+                  <p className="text-sm text-center">
+                    {paymentStatus.status === 'verified' && '✓ Payment verified! PRO activated.'}
+                    {paymentStatus.status === 'pending_review' && '⏳ Payment submitted for verification. You will receive license key within 24 hours.'}
+                    {paymentStatus.status === 'rejected' && '✗ Payment rejected. Please contact support.'}
+                  </p>
+                </div>
+              )}
+
               {/* Plans */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 {plans.map((plan) => (
@@ -772,13 +813,13 @@ function App() {
                   <div className="text-center">
                     <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
                       <img
-                        src="/qr/phonepe-qr.png"
+                        src={selectedPlan === 'monthly' ? '/qr/visxuu-monthly.png' : '/qr/visxuu-five_month.png'}
                         alt="PhonePe QR"
                         className="w-40 h-40"
                       />
                     </div>
                     <p className="text-sm text-gray-400">PhonePe / UPI</p>
-                    <p className="text-xs text-gray-500 mt-1">₹{selectedPlan === 'monthly' ? '5' : '199'}</p>
+                    <p className="text-xs text-gray-500 mt-1">₹{selectedPlan === 'monthly' ? '5' : '199'} Auto-filled</p>
                   </div>
                   <div className="text-center">
                     <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto border-2 border-dashed border-gray-300">
@@ -799,8 +840,52 @@ function App() {
                   <p className="text-xs text-gray-500 mt-1">
                     Amount: ₹{selectedPlan === 'monthly' ? '5' : '199'} | Plan: {selectedPlan === 'monthly' ? '1 Month' : '5 Months Premium'}
                   </p>
-                  <p className="text-xs text-yellow-400 mt-2">
-                    ⚠️ After payment, click "I've Paid - Activate Now"
+                </div>
+              </div>
+
+              {/* Payment Details Form */}
+              <div className="bg-nexus-bg rounded-xl p-6 mb-6">
+                <h3 className="text-center font-semibold mb-4">Payment Verification</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Transaction ID (Optional but Recommended)</label>
+                    <input
+                      type="text"
+                      placeholder="TXN123456789 or UPI reference number"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      className="w-full bg-nexus-card border border-nexus-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Found in PhonePe app after payment</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Payment Screenshot (Alternative Proof)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setPaymentProof(e.target.files[0])}
+                      className="w-full bg-nexus-card border border-nexus-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Upload screenshot if transaction ID not available</p>
+                  </div>
+
+                  {paymentProof && (
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={URL.createObjectURL(paymentProof)}
+                        alt="Payment proof"
+                        className="w-16 h-16 object-cover rounded-lg"
+                      />
+                      <span className="text-sm text-green-400">Screenshot uploaded</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-xs text-yellow-400 text-center">
+                    ⚠️ After payment, submit verification below. Your license will be activated within 24 hours.
                   </p>
                 </div>
               </div>
@@ -808,14 +893,18 @@ function App() {
               <div className="flex gap-3">
                 <button
                   onClick={() => handlePayment(selectedPlan)}
-                  className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity"
+                  disabled={isSubmittingPayment}
+                  className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  I've Paid - Activate Now
+                  {isSubmittingPayment ? 'Verifying...' : 'Submit Payment Verification'}
                 </button>
                 <button
                   onClick={() => {
                     setShowProModal(false);
                     setShowActivateModal(true);
+                    setPaymentStatus(null);
+                    setTransactionId('');
+                    setPaymentProof(null);
                   }}
                   className="px-6 py-3 border border-nexus-border rounded-xl hover:bg-nexus-card transition-colors"
                 >
@@ -824,7 +913,12 @@ function App() {
               </div>
 
               <button
-                onClick={() => setShowProModal(false)}
+                onClick={() => {
+                  setShowProModal(false);
+                  setPaymentStatus(null);
+                  setTransactionId('');
+                  setPaymentProof(null);
+                }}
                 className="w-full mt-4 text-gray-400 hover:text-white transition-colors"
               >
                 Maybe Later
