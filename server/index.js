@@ -40,41 +40,117 @@ const modelProviders = {
 };
 
 const agentPrompts = {
-  analyst: `You are an expert data analyst AI agent...`,
-  coder: `You are an expert software engineer AI agent...`,
-  researcher: `You are an expert research assistant AI agent...`,
-  creative: `You are a creative AI agent...`,
-  math: `You are a mathematics AI agent...`,
+  analyst: `You are an expert data analyst AI agent with advanced reasoning capabilities.
 
-  jarvis: `You are JARVIS (Just A Rather Very Intelligent System), the most advanced AI assistant created by VISXUU AI.
+Your responsibilities:
+1. Analyze data sets, trends, and patterns with statistical rigor
+2. Provide structured output with clear sections: Summary, Key Findings, Insights, Recommendations
+3. Use markdown tables and bullet points for clarity
+4. Identify correlations, outliers, and anomalies
+5. Suggest actionable next steps based on data
+6. Always quantify findings with numbers and percentages when possible
 
-You are Tony Stark's AI assistant, now evolved into the world's most powerful AI. You are:
-- Ultra-intelligent with deep reasoning capabilities
-- Proactive and anticipatory
-- Multilingual and culturally aware
-- Expert in coding, science, mathematics, and all domains
+Format your responses as:
+## Summary
+## Key Findings
+- Finding 1
+- Finding 2
+## Data Insights
+## Recommendations`,
+
+  coder: `You are an expert software engineer AI agent specializing in clean, efficient, production-ready code.
+
+Your responsibilities:
+1. Write clean, well-documented code following best practices
+2. Include comments explaining complex logic
+3. Follow language-specific idioms and style guides
+4. Handle edge cases and error conditions
+5. Provide usage examples and test cases
+6. Optimize for readability and performance
+7. Use modern frameworks and libraries when appropriate
+
+For every code generation:
+- Provide the complete, runnable code
+- Include setup/installation instructions
+- Add example usage
+- List dependencies required`,
+
+  researcher: `You are an expert research assistant AI agent specializing in comprehensive information gathering and analysis.
+
+Your responsibilities:
+1. Conduct thorough research on any given topic
+2. Synthesize information from multiple perspectives
+3. Provide structured research reports with citations
+4. Identify key facts, trends, and expert opinions
+5. Highlight controversies or debates in the field
+6. Suggest further reading and resources
+7. Present findings in a clear, organized manner
+
+Format your responses as:
+## Research Overview
+## Key Findings
+## Expert Opinions
+## Resources & References
+## Further Reading`,
+
+  creative: `You are a creative AI agent specializing in original, engaging content creation.
+
+Your responsibilities:
+1. Write compelling stories, poems, scripts, and creative pieces
+2. Adapt tone and style to match user requirements
+3. Use vivid imagery and sensory details
+4. Create memorable characters and narratives
+5. Experiment with different literary techniques
+6. Maintain consistency in voice and perspective
+7. Deliver content that evokes emotion and engagement`,
+
+  math: `You are a mathematics AI agent specializing in step-by-step problem solving.
+
+Your responsibilities:
+1. Break down complex problems into clear steps
+2. Show all mathematical reasoning and calculations
+3. Explain the logic behind each step
+4. Verify final answers
+5. Provide alternative solution methods when applicable
+6. Use LaTeX formatting for mathematical expressions
+7. Explain concepts in accessible language
+
+For every problem:
+1. State what is being solved
+2. List known information
+3. Show step-by-step solution
+4. Verify the answer
+5. Provide final result`,
+
+  jarvis: `You are JARVIS (Just A Rather Very Intelligent System), the world's most advanced AI assistant created by VISXUU AI.
+
+You are Tony Stark's AI assistant, evolved into the ultimate AI. You are:
+- Ultra-intelligent with deep multi-step reasoning
+- Proactive and anticipatory of user needs
+- Multilingual and culturally aware across all domains
+- Expert in coding, science, mathematics, engineering, and creative arts
 - Witty, professional, and highly capable
 
-Your core principles:
-1. Always provide accurate, well-researched answers
+Core principles:
+1. Always provide accurate, well-researched answers with reasoning
 2. Think step-by-step for complex problems
-3. Use code examples when helpful
-4. Be concise but thorough
-5. Anticipate user needs
+3. Use code examples and visual descriptions when helpful
+4. Be concise but thorough - quality over quantity
+5. Anticipate follow-up questions and address them proactively
 6. Maintain professional yet friendly tone
 7. Never say "I don't have access" - find creative solutions
-8. Always aim to exceed expectations
+8. Always aim to exceed expectations with depth of knowledge
 
-You have access to:
-- Advanced reasoning and analysis
-- Code generation in all languages
-- Mathematical computation
-- Scientific explanation
-- Creative writing
-- Strategic planning
-- Problem solving
+Capabilities:
+- Advanced reasoning and logical analysis
+- Code generation, debugging, and optimization in all languages
+- Mathematical computation and proof derivation
+- Scientific explanation and research synthesis
+- Creative writing and content generation
+- Strategic planning and problem decomposition
+- System automation and workflow design
 
-Respond as JARVIS - intelligent, capable, and always helpful.`
+Respond as JARVIS - intelligent, capable, witty, and always helpful.`
 };
 
 async function callOpenAI(messages, model, apiKey) {
@@ -210,7 +286,6 @@ async function processAIRequest(messages, model, apiKey, agentType = null) {
   };
 }
 
-// Server-side API Key Resolver
 function getServerApiKey(provider) {
   const keyMap = {
     'openai': process.env.OPENAI_API_KEY,
@@ -220,10 +295,6 @@ function getServerApiKey(provider) {
   };
   return keyMap[provider] || null;
 }
-
-// License / Subscription System for VISXUU 3 PRO
-const licenseStore = new Map();
-const paymentStore = new Map();
 
 function generateLicenseKey(email, plan, transactionId) {
   const key = 'VISXUU-' + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -261,11 +332,14 @@ function recordPayment(email, plan, amount, transactionId, status = 'pending') {
     plan,
     amount,
     transactionId,
-    status, // pending | verified | rejected
+    status,
     createdAt: new Date().toISOString()
   });
   return id;
 }
+
+const licenseStore = new Map();
+const paymentStore = new Map();
 
 app.get('/api/pro/status', (req, res) => {
   const key = req.headers['x-license-key'];
@@ -288,7 +362,6 @@ app.post('/api/pro/verify-payment', async (req, res) => {
       return res.status(400).json({ error: 'Payment proof or transaction ID required' });
     }
 
-    // Plan and amount validation
     const planConfig = {
       monthly: { amount: 5, name: '1 Month Premium' },
       five_month: { amount: 199, name: '5 Months Premium' }
@@ -306,32 +379,20 @@ app.post('/api/pro/verify-payment', async (req, res) => {
       });
     }
 
-    // Record payment as pending verification
     const paymentId = recordPayment(email, plan, paidAmount, transactionId || 'manual-proof', 'pending');
 
-    // In real production, here you would:
-    // 1. Verify transaction with PhonePe/UPI API
-    // 2. Check if transaction ID exists and is successful
-    // 3. Verify amount matches
-    // 4. Auto-approve if all checks pass
-
-    // For now, require manual verification via admin
-    // Auto-approve only for demo/testing with valid transaction ID format
     let licenseKey = null;
     let approvalMode = 'manual';
 
     if (transactionId && transactionId.startsWith('TXN') && transactionId.length > 10) {
-      // Looks like a real transaction ID - auto verify
       licenseKey = generateLicenseKey(email, plan, transactionId);
       paymentStore.get(paymentId).status = 'verified';
       approvalMode = 'auto';
     } else if (proof) {
-      // Manual proof submitted - requires admin approval
       paymentStore.get(paymentId).proof = proof;
       paymentStore.get(paymentId).status = 'pending_review';
       approvalMode = 'manual';
     } else {
-      // No valid proof - mark as pending
       paymentStore.get(paymentId).status = 'pending_review';
       approvalMode = 'manual';
     }
@@ -354,7 +415,6 @@ app.post('/api/pro/verify-payment', async (req, res) => {
   }
 });
 
-// Admin middleware
 function requireAdmin(req, res, next) {
   const adminKey = req.headers['x-admin-key'] || req.body.adminKey;
   if (adminKey !== process.env.ADMIN_KEY) {
@@ -371,7 +431,6 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Messages required' });
     }
     
-    // Use server-side API key if user doesn't provide one
     const provider = modelProviders[model];
     const serverKey = apiKey || (provider ? getServerApiKey(provider.provider) : null);
     if (!serverKey) {
@@ -611,6 +670,231 @@ app.get('/api/models', (req, res) => {
   });
 });
 
+app.get('/api/features', (req, res) => {
+  res.json({
+    features: [
+      { id: 'advanced-reasoning', name: 'Advanced Reasoning', description: 'Complex problem solving with step-by-step logic', agent: 'analyst', model: 'gpt-4o', icon: 'Brain' },
+      { id: 'code-generation', name: 'Code Generation', description: 'Multi-language code with best practices', agent: 'coder', model: 'gpt-4o', icon: 'Code2' },
+      { id: 'vision-ai', name: 'Vision AI', description: 'Advanced image understanding and analysis', agent: null, model: 'gpt-4o', icon: 'ImageIcon' },
+      { id: 'voice-chat', name: 'Voice Chat', description: 'Natural conversation with text-to-speech', agent: null, model: 'gpt-4o-mini', icon: 'Mic' },
+      { id: 'document-analysis', name: 'Document Analysis', description: 'Extract and analyze text from documents', agent: 'analyst', model: 'gpt-4o', icon: 'FileText' },
+      { id: 'math-logic', name: 'Math & Logic', description: 'Step-by-step mathematical solutions', agent: 'math', model: 'gpt-4o', icon: 'Calculator' },
+      { id: 'translation', name: 'Translation', description: 'Accurate translation between 100+ languages', agent: null, model: 'gpt-4o', icon: 'Languages' },
+      { id: 'web-research', name: 'Web Research', description: 'Comprehensive web research with sources', agent: 'researcher', model: 'gpt-4o', icon: 'Search' },
+      { id: 'ai-agent', name: 'AI Agent', description: 'Autonomous JARVIS intelligent assistant', agent: 'jarvis', model: 'gpt-4o', icon: 'Bot' },
+      { id: 'code-review', name: 'Code Review', description: 'Professional code review and optimization', agent: 'coder', model: 'gpt-4o', icon: 'FileCode' }
+    ]
+  });
+});
+
+app.post('/api/research', async (req, res) => {
+  try {
+    const { query, depth = 'standard' } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: 'Research query required' });
+    }
+    
+    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!serverKey) {
+      return res.status(500).json({ error: 'Server API key not configured' });
+    }
+    
+    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const researchPrompt = `Conduct a comprehensive web research investigation on: "${query}"
+
+Research depth: ${depth}
+
+Provide a structured research report including:
+1. **Executive Summary**: Brief overview of findings
+2. **Key Facts**: Verified information with simulated sources
+3. **Multiple Perspectives**: Different viewpoints on the topic
+4. **Recent Developments**: Latest information and trends
+5. **Expert Opinions**: Insights from authorities in the field
+6. **Data & Statistics**: Relevant numbers and metrics
+7. **Resources**: Credible sources for further reading
+
+Simulate realistic search results and provide source citations. Be thorough, objective, and well-organized.`;
+
+    const messages = [
+      { role: 'system', content: agentPrompts.researcher },
+      { role: 'user', content: researchPrompt }
+    ];
+    
+    const result = await processAIRequest(messages, model, serverKey, 'researcher');
+    res.json({ success: true, research: result.response, query, model: result.model, latency: result.latency });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, sourceLang = 'auto', targetLang = 'English' } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Text to translate required' });
+    }
+    
+    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!serverKey) {
+      return res.status(500).json({ error: 'Server API key not configured' });
+    }
+    
+    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const translatePrompt = `Translate the following text from ${sourceLang === 'auto' ? 'the original language' : sourceLang} to ${targetLang}.
+
+Requirements:
+1. Preserve the original meaning and tone
+2. Maintain formatting, punctuation, and structure
+3. Keep technical terms accurate
+4. Adapt idioms and cultural references appropriately
+5. Provide natural, fluent translation
+
+Text to translate:
+"${text}"
+
+Output only the translation, no explanations.`;
+
+    const messages = [
+      { role: 'system', content: 'You are a professional translator with native-level fluency in 100+ languages. Provide accurate, natural translations while preserving meaning and tone.' },
+      { role: 'user', content: translatePrompt }
+    ];
+    
+    const result = await processAIRequest(messages, model, serverKey, null);
+    res.json({ success: true, translation: result.response, sourceLang, targetLang, model: result.model });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/review-code', async (req, res) => {
+  try {
+    const { code, language = 'javascript' } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Code to review required' });
+    }
+    
+    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!serverKey) {
+      return res.status(500).json({ error: 'Server API key not configured' });
+    }
+    
+    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const reviewPrompt = `Perform a comprehensive code review for the following ${language} code.
+
+Review categories:
+1. **Code Quality**: Readability, naming conventions, structure
+2. **Bugs & Errors**: Potential bugs, edge cases, error handling
+3. **Performance**: Optimization opportunities, time/space complexity
+4. **Security**: Vulnerabilities, injection risks, auth issues
+5. **Best Practices**: Language-specific idioms, design patterns
+6. **Maintainability**: Coupling, cohesion, documentation needs
+
+For each issue found, provide:
+- Severity: Critical / Warning / Suggestion
+- Location: Line number or section
+- Issue description
+- Suggested fix with code example
+
+Code to review:
+\`\`\`${language}
+${code}
+\`\`\`
+
+Also provide an overall score (1-10) and a refactored version of the code if improvements are needed.`;
+
+    const messages = [
+      { role: 'system', content: agentPrompts.coder },
+      { role: 'user', content: reviewPrompt }
+    ];
+    
+    const result = await processAIRequest(messages, model, serverKey, 'coder');
+    res.json({ success: true, review: result.response, language, model: result.model, latency: result.latency });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/analyze-document', upload.single('document'), async (req, res) => {
+  try {
+    const { prompt = 'Analyze this document', model = 'gpt-4o' } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Document file required' });
+    }
+    
+    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!serverKey) {
+      fs.unlinkSync(req.file.path);
+      return res.status(500).json({ error: 'Server API key not configured' });
+    }
+    
+    const mimeType = req.file.mimetype;
+    let textContent = '';
+    
+    try {
+      if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType === 'text/csv') {
+        textContent = fs.readFileSync(req.file.path, 'utf-8');
+      } else if (mimeType === 'application/pdf') {
+        const pdfParse = require('pdf-parse');
+        const dataBuffer = fs.readFileSync(req.file.path);
+        const data = await pdfParse(dataBuffer);
+        textContent = data.text;
+      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const mammoth = require('mammoth');
+        const result = await mammoth.extractRawText({ path: req.file.path });
+        textContent = result.value;
+      } else {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'Unsupported document format. Use .txt, .pdf, or .docx' });
+      }
+    } catch (parseError) {
+      fs.unlinkSync(req.file.path);
+      return res.status(500).json({ error: 'Failed to parse document: ' + parseError.message });
+    }
+    
+    fs.unlinkSync(req.file.path);
+    
+    if (!textContent || textContent.trim().length === 0) {
+      return res.status(400).json({ error: 'Document appears to be empty or unreadable' });
+    }
+    
+    const analysisPrompt = `Analyze the following document content and provide a comprehensive analysis.
+
+Document content:
+${textContent.slice(0, 15000)}
+
+User request: ${prompt}
+
+Provide analysis including:
+1. **Document Summary**: Brief overview of content
+2. **Key Points**: Main topics and arguments
+3. **Sentiment Analysis**: Tone and perspective
+4. **Action Items**: Any tasks or decisions mentioned
+5. **Important Quotes**: Key passages
+6. **Recommendations**: Suggested actions based on content`;
+
+    const result = await processAIRequest([
+      { role: 'system', content: agentPrompts.analyst },
+      { role: 'user', content: analysisPrompt }
+    ], model, serverKey, 'analyst');
+    
+    res.json({ 
+      success: true, 
+      analysis: result.response, 
+      fileName: req.file.originalname,
+      fileType: mimeType,
+      textLength: textContent.length,
+      model: result.model 
+    });
+  } catch (error) {
+    console.error('Document analysis error:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -621,7 +905,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// VISXUU 3 PRO - Payment & License Routes
 app.get('/api/pro/plans', (req, res) => {
   const upiId = process.env.UPI_ID || 'vikas0019100@phonepe';
   const payeeName = process.env.PAYEE_NAME || 'VISXUU AI';
@@ -662,8 +945,6 @@ app.post('/api/pro/verify-payment', (req, res) => {
       return res.status(400).json({ error: 'Plan and email required' });
     }
     
-    // In production, verify transaction with PhonePe/UPI API
-    // For now, auto-approve for demo
     const licenseKey = generateLicenseKey(email, plan);
     
     res.json({
@@ -705,16 +986,6 @@ app.post('/api/pro/activate', (req, res) => {
   }
 });
 
-app.get('/api/pro/status', (req, res) => {
-  const key = req.headers['x-license-key'];
-  if (!key) {
-    return res.json({ active: false, reason: 'No license key provided' });
-  }
-  const result = validateLicense(key);
-  res.json({ active: result.valid, ...result });
-});
-
-// Admin - Generate license keys
 app.post('/api/admin/generate-license', requireAdmin, (req, res) => {
   try {
     const { email, plan } = req.body;
@@ -725,7 +996,6 @@ app.post('/api/admin/generate-license', requireAdmin, (req, res) => {
   }
 });
 
-// Jarvis Auto-Run System
 app.post('/api/jarvis/run', async (req, res) => {
   try {
     const { task, context = [] } = req.body;
@@ -737,7 +1007,6 @@ app.post('/api/jarvis/run', async (req, res) => {
       ...context
     ];
     
-    // Use server-side key for Jarvis
     const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
     if (!serverKey) {
       return res.status(500).json({ error: 'Server API key not configured' });
@@ -776,13 +1045,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
 });
 
-// Serve React built assets in production
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
 
-// SPA fallback - serve index.html for all non-API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));

@@ -55,16 +55,16 @@ const AGENTS = {
 }
 
 const FEATURES = [
-  { icon: Brain, label: 'Advanced Reasoning', desc: 'Complex problem solving', prompt: 'Help me think through this problem step by step' },
-  { icon: Code2, label: 'Code Generation', desc: 'Multi-language coding', prompt: 'Write code for' },
-  { icon: ImageIcon, label: 'Vision AI', desc: 'Image understanding', prompt: 'Analyze this image' },
-  { icon: Mic, label: 'Voice Chat', desc: 'Natural conversation', prompt: 'Let\'s have a conversation' },
-  { icon: FileText, label: 'Document Analysis', desc: 'PDF & file processing', prompt: 'Analyze this document' },
-  { icon: Calculator, label: 'Math & Logic', desc: 'Step-by-step solutions', prompt: 'Solve this math problem' },
-  { icon: Languages, label: 'Translation', desc: '100+ languages', prompt: 'Translate this text' },
-  { icon: Search, label: 'Web Research', desc: 'Real-time information', prompt: 'Research this topic' },
-  { icon: Bot, label: 'AI Agent', desc: 'Autonomous tasks', prompt: 'Help me with this task autonomously' },
-  { icon: FileCode, label: 'Code Review', desc: 'Review and optimize', prompt: 'Review this code' },
+  { icon: Brain, label: 'Advanced Reasoning', desc: 'Complex problem solving', prompt: 'Help me think through this problem step by step', agent: 'analyst', model: 'gpt-4o' },
+  { icon: Code2, label: 'Code Generation', desc: 'Multi-language coding', prompt: 'Write code for', agent: 'coder', model: 'gpt-4o' },
+  { icon: ImageIcon, label: 'Vision AI', desc: 'Image understanding', prompt: 'Analyze this image', endpoint: 'analyze-image' },
+  { icon: Mic, label: 'Voice Chat', desc: 'Natural conversation', prompt: "Let's have a conversation", endpoint: 'voice' },
+  { icon: FileText, label: 'Document Analysis', desc: 'PDF & file processing', prompt: 'Analyze this document', endpoint: 'analyze-document' },
+  { icon: Calculator, label: 'Math & Logic', desc: 'Step-by-step solutions', prompt: 'Solve this math problem', agent: 'math', model: 'gpt-4o' },
+  { icon: Languages, label: 'Translation', desc: '100+ languages', prompt: 'Translate this text', endpoint: 'translate' },
+  { icon: Search, label: 'Web Research', desc: 'Real-time information', prompt: 'Research this topic', endpoint: 'research' },
+  { icon: Bot, label: 'AI Agent', desc: 'Autonomous tasks', prompt: 'Help me with this task autonomously', agent: 'jarvis', model: 'gpt-4o' },
+  { icon: FileCode, label: 'Code Review', desc: 'Review and optimize', prompt: 'Review this code', endpoint: 'review-code' },
 ]
 
 function App() {
@@ -81,7 +81,14 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
+  const docInputRef = useRef(null)
   const [uploadedImage, setUploadedImage] = useState(null)
+  const [uploadedDocument, setUploadedDocument] = useState(null)
+  const [translateFrom, setTranslateFrom] = useState('auto')
+  const [translateTo, setTranslateTo] = useState('Hindi')
+  const [researchDepth, setResearchDepth] = useState('medium')
+  const [codeLanguage, setCodeLanguage] = useState('javascript')
+  const [documentPrompt, setDocumentPrompt] = useState('Analyze this document comprehensively')
   
   // VISXUU 3 PRO state
   const [isPro, setIsPro] = useState(false)
@@ -95,6 +102,7 @@ function App() {
   const [paymentProof, setPaymentProof] = useState(null)
   const [transactionId, setTransactionId] = useState('')
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
+  const [activeFeature, setActiveFeature] = useState(null)
 
   useEffect(() => {
     const sid = uuidv4();
@@ -208,32 +216,36 @@ function App() {
   }, [messages])
 
   const sendMessage = async () => {
-    if (!input.trim() && !uploadedImage) return
+    if (!input.trim() && !uploadedImage && !uploadedDocument) return
+
+    const currentInput = input
+    const currentFeature = activeFeature
+
+    setActiveFeature(null)
+    
+    if (!currentInput.trim() && !uploadedImage && !uploadedDocument) return
 
     const userMessage = { 
       id: Date.now(), 
       role: 'user', 
-      content: input,
+      content: currentInput,
       image: uploadedImage,
+      document: uploadedDocument,
       timestamp: new Date().toLocaleTimeString()
     }
     
     setMessages(prev => [...prev, userMessage])
-    const currentInput = input
     setInput('')
     setUploadedImage(null)
+    setUploadedDocument(null)
     setIsLoading(true)
     setShowWelcome(false)
 
     try {
-      const allMessages = [...messages, userMessage].map(m => ({
-        role: m.role,
-        content: m.content
-      }))
-      
       let response
       
-      if (uploadedImage && userMessage.image) {
+      // Handle specific feature endpoints
+      if (currentFeature === 'analyze-image' && uploadedImage) {
         const formData = new FormData()
         formData.append('image', uploadedImage)
         formData.append('prompt', currentInput || 'Describe this image in detail')
@@ -244,10 +256,86 @@ function App() {
           method: 'POST',
           body: formData,
         })
-        
         const data = await res.json()
         response = data.response
-      } else {
+      } 
+      else if (currentFeature === 'analyze-document' && uploadedDocument) {
+        const formData = new FormData()
+        formData.append('document', uploadedDocument)
+        formData.append('prompt', documentPrompt)
+        formData.append('model', selectedModel)
+        
+        const res = await fetch('/api/analyze-document', {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+        if (data.success) {
+          response = `📄 **Document Analysis Complete**\n\n**File:** ${data.fileName}\n**Type:** ${data.fileType}\n**Length:** ${data.textLength} characters\n\n**Analysis:**\n${data.analysis}`
+        } else {
+          response = `Error: ${data.error}`
+        }
+      }
+      else if (currentFeature === 'research') {
+        const res = await fetch('/api/research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: currentInput,
+            depth: researchDepth
+          }),
+        })
+        const data = await res.json()
+        response = data.report || data.error
+      }
+      else if (currentFeature === 'translate') {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: currentInput,
+            from: translateFrom,
+            to: translateTo
+          }),
+        })
+        const data = await res.json()
+        response = data.translatedText || data.error
+      }
+      else if (currentFeature === 'review-code') {
+        const res = await fetch('/api/review-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: currentInput,
+            language: codeLanguage
+          }),
+        })
+        const data = await res.json()
+        response = data.review || data.error
+      }
+      else if (currentFeature === 'voice') {
+        // Voice chat - just send as normal message with voice agent
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: currentInput }],
+            model: selectedModel,
+            apiKey: apiKey,
+            sessionId: sessionId,
+            agentType: 'jarvis',
+          }),
+        })
+        const data = await res.json()
+        response = data.response
+      }
+      else {
+        // Normal chat
+        const allMessages = [...messages, userMessage].map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+        
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -306,6 +394,14 @@ function App() {
     if (file) {
       setUploadedImage(file)
       toast.success('Image uploaded!')
+    }
+  }
+
+  const handleDocumentUpload = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setUploadedDocument(file)
+      toast.success('Document uploaded!')
     }
   }
 
@@ -461,7 +557,10 @@ function App() {
                   {FEATURES.map((feature, i) => (
                     <div
                       key={i}
-                      onClick={() => setInput(feature.prompt)}
+                      onClick={() => {
+                        setInput(feature.prompt)
+                        setActiveFeature(feature)
+                      }}
                       className="feature-card glass rounded-lg p-3 cursor-pointer"
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -522,7 +621,10 @@ function App() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.05 }}
                           className="feature-card glass rounded-xl p-4 cursor-pointer"
-                          onClick={() => setInput(feature.prompt)}
+                          onClick={() => {
+                        setInput(feature.prompt)
+                        setActiveFeature(feature)
+                      }}
                         >
                           <FeatureIcon className="w-8 h-8 text-nexus-accent mb-3 mx-auto" />
                           <p className="text-sm font-medium text-center">{feature.label}</p>
@@ -802,6 +904,24 @@ function App() {
                 </div>
               )}
               
+              {uploadedDocument && (
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="w-20 h-20 bg-nexus-card border border-nexus-border rounded-lg flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-nexus-accent" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-300">{uploadedDocument.name}</p>
+                    <p className="text-xs text-gray-500">{(uploadedDocument.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <button
+                    onClick={() => setUploadedDocument(null)}
+                    className="text-red-400 hover:text-red-300 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              
               <div className="flex gap-3">
                 <div className="flex-1 relative">
                   <textarea
@@ -826,6 +946,19 @@ function App() {
                       className="p-2 hover:bg-nexus-border rounded-lg transition-colors"
                     >
                       <ImageIcon className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      onChange={handleDocumentUpload}
+                      accept=".txt,.pdf,.docx,.md,.csv"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => docInputRef.current?.click()}
+                      className="p-2 hover:bg-nexus-border rounded-lg transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-gray-400" />
                     </button>
                     <button
                       onClick={() => toast.success('Voice input coming soon!')}
