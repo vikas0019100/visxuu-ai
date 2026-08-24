@@ -764,22 +764,24 @@ function App() {
                   <div className="text-center">
                     <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
                       <img
-                        src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas0019100@phonepe&pn=VISXUU+AI&am=5&cu=INR"
-                        alt="PhonePe QR"
+                        src={selectedPlan === 'monthly' ? '/qr/visxuu-monthly.png' : '/qr/visxuu-five_month.png'}
+                        alt="Payment QR"
                         className="w-40 h-40"
                       />
                     </div>
                     <p className="text-sm text-gray-400">PhonePe / UPI</p>
+                    <p className="text-xs text-gray-500 mt-1">₹{selectedPlan === 'monthly' ? '5' : '199'}</p>
                   </div>
                   <div className="text-center">
-                    <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
-                      <img
-                        src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://visxuu-ai.onrender.com"
-                        alt="VISXUU AI"
-                        className="w-40 h-40"
-                      />
+                    <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto border-2 border-dashed border-gray-300">
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">📱</div>
+                        <p className="text-xs text-gray-500">Open PhonePe App</p>
+                        <p className="text-xs text-gray-400 mt-1">Scan Above QR</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-400">VISXUU AI</p>
+                    <p className="text-sm text-gray-400">Or Pay via App</p>
+                    <p className="text-xs text-gray-500 mt-1">Fast & Secure</p>
                   </div>
                 </div>
                 <div className="mt-4 text-center">
@@ -787,7 +789,10 @@ function App() {
                     UPI ID: <span className="text-white font-mono">vikas0019100@phonepe</span>
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Pay ₹{selectedPlan === 'monthly' ? '5' : '199'} and click below
+                    Amount: ₹{selectedPlan === 'monthly' ? '5' : '199'} | Plan: {selectedPlan === 'monthly' ? '1 Month' : '5 Months Premium'}
+                  </p>
+                  <p className="text-xs text-yellow-400 mt-2">
+                    ⚠️ After payment, click "I've Paid - Activate Now"
                   </p>
                 </div>
               </div>

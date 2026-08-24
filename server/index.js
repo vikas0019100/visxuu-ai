@@ -522,6 +522,9 @@ app.get('/api/health', (req, res) => {
 
 // VISXUU 3 PRO - Payment & License Routes
 app.get('/api/pro/plans', (req, res) => {
+  const upiId = process.env.UPI_ID || 'vikas0019100@phonepe';
+  const payeeName = process.env.PAYEE_NAME || 'VISXUU AI';
+  
   res.json({
     plans: [
       {
@@ -543,8 +546,9 @@ app.get('/api/pro/plans', (req, res) => {
       },
     ],
     qr: {
-      phonepe: process.env.PHONEPAY_QR || 'https://your-phonepe-qr-link.com',
-      upi: process.env.UPI_ID || 'your-upi-id@phonepe',
+      phonepe: process.env.PHONEPAY_QR || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}`,
+      upi: upiId,
+      payeeName,
     }
   });
 });
