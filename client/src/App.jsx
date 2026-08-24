@@ -402,7 +402,7 @@ function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-nexus-card rounded-lg transition-colors md:hidden"
+              className="md:hidden p-2 hover:bg-nexus-card rounded-lg transition-colors"
             >
               <MessageSquare className="w-5 h-5 text-gray-400" />
             </button>
@@ -524,12 +524,33 @@ function App() {
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
-            <motion.aside
-              initial={{ x: -300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -300, opacity: 0 }}
-              className="w-72 glass border-r border-nexus-border p-4 hidden md:block overflow-y-auto"
-            >
+            <React.Fragment>
+              {/* Mobile overlay */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-20 md:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <motion.aside
+                initial={{ x: -300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -300, opacity: 0 }}
+                className="fixed md:relative z-30 md:z-auto w-72 h-full md:h-auto glass border-r border-nexus-border p-4 overflow-y-auto"
+              >
+                {/* Mobile close button */}
+                <div className="flex justify-between items-center mb-4 md:hidden">
+                  <h2 className="text-lg font-bold nexus-gradient-text">VISXUU AI</h2>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-2 hover:bg-nexus-card rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               {selectedAgent && (
                 <div className="mb-6">
                   <h3 className="text-xs font-semibold text-nexus-accent uppercase tracking-wider mb-2">
@@ -584,6 +605,7 @@ function App() {
                 </div>
               </div>
             </motion.aside>
+            </React.Fragment>
           )}
         </AnimatePresence>
 
