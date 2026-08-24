@@ -32,8 +32,8 @@ const modelProviders = {
   'claude-3.5-sonnet': { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', speed: 'fast', intelligence: 'ultra', context: '200k' },
   'claude-3-opus': { provider: 'anthropic', model: 'claude-3-opus-20240229', speed: 'medium', intelligence: 'ultra', context: '200k' },
   'claude-3-haiku': { provider: 'anthropic', model: 'claude-3-haiku-20240307', speed: 'ultra', intelligence: 'high', context: '200k' },
-  'gemini-1.5-pro': { provider: 'google', model: 'gemini-1.5-pro-latest', speed: 'fast', intelligence: 'high', context: '1M' },
-  'gemini-1.5-flash': { provider: 'google', model: 'gemini-1.5-flash-latest', speed: 'ultra', intelligence: 'high', context: '1M' },
+  'gemini-1.5-pro': { provider: 'google', model: 'gemini-3.5-flash', speed: 'fast', intelligence: 'high', context: '1M' },
+  'gemini-1.5-flash': { provider: 'google', model: 'gemini-3.6-flash', speed: 'ultra', intelligence: 'high', context: '1M' },
   'llama-3.1-70b': { provider: 'groq', model: 'groq/compound', speed: 'ultra', intelligence: 'high', context: '128k' },
   'llama-3.1-8b': { provider: 'groq', model: 'groq/compound-mini', speed: 'ultra', intelligence: 'medium', context: '8k' },
   'mixtral-8x7b': { provider: 'groq', model: 'groq/compound', speed: 'fast', intelligence: 'high', context: '32k' },
@@ -233,7 +233,11 @@ async function callGoogle(messages, model, apiKey) {
   prompt += 'Assistant:';
   
   const result = await gemini.generateContent(prompt);
-  return result.response.text();
+  const responseText = result.response.text();
+  if (!responseText || responseText.trim() === '') {
+    throw new Error('Empty response from Gemini');
+  }
+  return responseText;
 }
 
 async function callGroq(messages, model, apiKey) {
@@ -1233,6 +1237,7 @@ app.post('/api/jarvis/run', async (req, res) => {
     try {
       result = await processAIRequest(messages, usedModel, serverKey, 'jarvis');
     } catch (primaryError) {
+      console.error('JARVIS primary model failed:', primaryError.message);
       if (usedModel === 'gemini-1.5-pro' && getValidServerKey('groq')) {
         usedModel = 'llama-3.1-70b';
         result = await processAIRequest(messages, usedModel, getValidServerKey('groq'), 'jarvis');
