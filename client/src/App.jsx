@@ -245,7 +245,7 @@ function App() {
       let response
       
       // Handle specific feature endpoints
-      if (currentFeature === 'analyze-image' && uploadedImage) {
+      if (currentFeature?.endpoint === 'analyze-image' && uploadedImage) {
         const formData = new FormData()
         formData.append('image', uploadedImage)
         formData.append('prompt', currentInput || 'Describe this image in detail')
@@ -257,9 +257,9 @@ function App() {
           body: formData,
         })
         const data = await res.json()
-        response = data.response
+        response = data.response || `Error: ${data.error || 'Unknown error'}`
       } 
-      else if (currentFeature === 'analyze-document' && uploadedDocument) {
+      else if (currentFeature?.endpoint === 'analyze-document' && uploadedDocument) {
         const formData = new FormData()
         formData.append('document', uploadedDocument)
         formData.append('prompt', documentPrompt)
@@ -273,10 +273,10 @@ function App() {
         if (data.success) {
           response = `📄 **Document Analysis Complete**\n\n**File:** ${data.fileName}\n**Type:** ${data.fileType}\n**Length:** ${data.textLength} characters\n\n**Analysis:**\n${data.analysis}`
         } else {
-          response = `Error: ${data.error}`
+          response = `Error: ${data.error || 'Unknown error'}`
         }
       }
-      else if (currentFeature === 'research') {
+      else if (currentFeature?.endpoint === 'research') {
         const res = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -286,9 +286,9 @@ function App() {
           }),
         })
         const data = await res.json()
-        response = data.report || data.error
+        response = data.report || `Error: ${data.error || 'Unknown error'}`
       }
-      else if (currentFeature === 'translate') {
+      else if (currentFeature?.endpoint === 'translate') {
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -299,9 +299,9 @@ function App() {
           }),
         })
         const data = await res.json()
-        response = data.translatedText || data.error
+        response = data.translatedText || `Error: ${data.error || 'Unknown error'}`
       }
-      else if (currentFeature === 'review-code') {
+      else if (currentFeature?.endpoint === 'review-code') {
         const res = await fetch('/api/review-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -311,23 +311,7 @@ function App() {
           }),
         })
         const data = await res.json()
-        response = data.review || data.error
-      }
-      else if (currentFeature === 'voice') {
-        // Voice chat - just send as normal message with voice agent
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: currentInput }],
-            model: selectedModel,
-            apiKey: apiKey,
-            sessionId: sessionId,
-            agentType: 'jarvis',
-          }),
-        })
-        const data = await res.json()
-        response = data.response
+        response = data.review || `Error: ${data.error || 'Unknown error'}`
       }
       else {
         // Normal chat
@@ -344,12 +328,17 @@ function App() {
             model: selectedModel,
             apiKey: apiKey,
             sessionId: sessionId,
-            agentType: selectedAgent,
+            agentType: currentFeature?.agent || selectedAgent,
           }),
         })
         
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ error: 'Network error' }))
+          throw new Error(errorData.error || `HTTP ${res.status}`)
+        }
+        
         const data = await res.json()
-        response = data.response
+        response = data.response || `Error: ${data.error || 'Unknown error'}`
       }
       
       setMessages(prev => [...prev, {
@@ -357,13 +346,21 @@ function App() {
         role: 'assistant',
         content: response,
         model: selectedModel,
-        agent: selectedAgent,
-        latency: data.latency,
+        agent: currentFeature?.agent || selectedAgent,
+        latency: data?.latency,
         timestamp: new Date().toLocaleTimeString()
       }])
     } catch (error) {
       toast.error('Failed to send message')
       console.error(error)
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: `⚠️ **Error:** ${error.message || 'Something went wrong. Please try again.'}`,
+        model: selectedModel,
+        agent: currentFeature?.agent || selectedAgent,
+        timestamp: new Date().toLocaleTimeString()
+      }])
     } finally {
       setIsLoading(false)
     }

@@ -432,10 +432,13 @@ app.post('/api/chat', async (req, res) => {
     }
     
     const provider = modelProviders[model];
-    const serverKey = apiKey || (provider ? getServerApiKey(provider.provider) : null);
-    if (!serverKey) {
-      return res.status(401).json({ error: 'API key required. Please add server keys or enter your own.' });
-    }
+  const serverKey = apiKey || (provider ? getServerApiKey(provider.provider) : null);
+  if (!serverKey) {
+    return res.status(400).json({ 
+      error: 'API key required. Please add valid API keys in server .env file, or enter your own key in settings.',
+      help: 'Server keys not configured. Contact administrator.'
+    });
+  }
     
     const cacheKey = `${model}:${JSON.stringify(messages).slice(0, 200)}`;
     const cached = cache.get(cacheKey);
@@ -457,7 +460,10 @@ app.post('/api/chat', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Chat error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Internal server error',
+      help: 'Please check server API keys configuration'
+    });
   }
 });
 
