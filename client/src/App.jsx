@@ -74,7 +74,7 @@ function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini')
+  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash')
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)

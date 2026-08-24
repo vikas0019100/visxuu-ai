@@ -454,7 +454,7 @@ function requireAdmin(req, res, next) {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, model = 'gpt-4o-mini', apiKey, sessionId, agentType = null } = req.body;
+    const { messages, model = 'gemini-1.5-flash', apiKey, sessionId, agentType = null } = req.body;
     
     if (!messages || !messages.length) {
       return res.status(400).json({ error: 'Messages required' });
@@ -469,7 +469,7 @@ app.post('/api/chat', async (req, res) => {
     }
     
     if (!serverKey && provider) {
-      const fallbackProviders = ['groq', 'openai', 'google', 'anthropic'];
+      const fallbackProviders = ['google', 'groq', 'openai', 'anthropic'];
       for (const prov of fallbackProviders) {
         const key = getValidServerKey(prov);
         if (key) {
@@ -895,7 +895,7 @@ app.post('/api/research', async (req, res) => {
       return res.status(400).json({ error: 'Research query required' });
     }
     
-    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
+    const serverKey = getValidServerKey('google') || getValidServerKey('groq') || getValidServerKey('openai');
     if (!serverKey) {
       return res.status(400).json({ 
         error: 'API key not configured. Please add valid API keys in server .env file.',
@@ -903,7 +903,7 @@ app.post('/api/research', async (req, res) => {
       });
     }
     
-    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const model = process.env.GOOGLE_API_KEY ? 'gemini-1.5-pro' : 'llama-3.1-70b';
     const researchPrompt = `Conduct a comprehensive web research investigation on: "${query}"
 
 Research depth: ${depth}
@@ -938,7 +938,7 @@ app.post('/api/translate', async (req, res) => {
       return res.status(400).json({ error: 'Text to translate required' });
     }
     
-    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
+    const serverKey = getValidServerKey('google') || getValidServerKey('groq') || getValidServerKey('openai');
     if (!serverKey) {
       return res.status(400).json({ 
         error: 'API key not configured. Please add valid API keys in server .env file.',
@@ -946,7 +946,7 @@ app.post('/api/translate', async (req, res) => {
       });
     }
     
-    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const model = process.env.GOOGLE_API_KEY ? 'gemini-1.5-pro' : 'llama-3.1-70b';
     const translatePrompt = `Translate the following text from ${sourceLang === 'auto' ? 'the original language' : sourceLang} to ${targetLang}.
 
 Requirements:
@@ -980,7 +980,7 @@ app.post('/api/review-code', async (req, res) => {
       return res.status(400).json({ error: 'Code to review required' });
     }
     
-    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
+    const serverKey = getValidServerKey('google') || getValidServerKey('groq') || getValidServerKey('openai');
     if (!serverKey) {
       return res.status(400).json({ 
         error: 'API key not configured. Please add valid API keys in server .env file.',
@@ -988,7 +988,7 @@ app.post('/api/review-code', async (req, res) => {
       });
     }
     
-    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const model = process.env.GOOGLE_API_KEY ? 'gemini-1.5-pro' : 'llama-3.1-70b';
     const reviewPrompt = `Perform a comprehensive code review for the following ${language} code.
 
 Review categories:
@@ -1219,7 +1219,7 @@ app.post('/api/jarvis/run', async (req, res) => {
       ...context
     ];
     
-    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
+    const serverKey = getValidServerKey('google') || getValidServerKey('groq') || getValidServerKey('openai');
     if (!serverKey) {
       return res.status(400).json({ 
         error: 'API key not configured. Please add valid API keys in server .env file.',
@@ -1227,17 +1227,17 @@ app.post('/api/jarvis/run', async (req, res) => {
       });
     }
     
-    let usedModel = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    let usedModel = process.env.GOOGLE_API_KEY ? 'gemini-1.5-pro' : 'llama-3.1-70b';
     let result;
     
     try {
       result = await processAIRequest(messages, usedModel, serverKey, 'jarvis');
-    } catch (openaiError) {
-      if (usedModel === 'gpt-4o' && getValidServerKey('groq')) {
+    } catch (primaryError) {
+      if (usedModel === 'gemini-1.5-pro' && getValidServerKey('groq')) {
         usedModel = 'llama-3.1-70b';
         result = await processAIRequest(messages, usedModel, getValidServerKey('groq'), 'jarvis');
       } else {
-        throw openaiError;
+        throw primaryError;
       }
     }
     
