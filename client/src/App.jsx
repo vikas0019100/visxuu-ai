@@ -63,8 +63,9 @@ const FEATURES = [
   { icon: Calculator, label: 'Math & Logic', desc: 'Step-by-step solutions', prompt: 'Solve this math problem', agent: 'math', model: 'gpt-4o' },
   { icon: Languages, label: 'Translation', desc: '100+ languages', prompt: 'Translate this text', endpoint: 'translate' },
   { icon: Search, label: 'Web Research', desc: 'Real-time information', prompt: 'Research this topic', endpoint: 'research' },
-  { icon: Bot, label: 'AI Agent', desc: 'Autonomous tasks', prompt: 'Help me with this task autonomously', agent: 'jarvis', model: 'gpt-4o' },
+  { icon: Bot, label: 'MARK L JARVIS', desc: 'Advanced autonomous AI assistant', prompt: 'Help me with this task autonomously', agent: 'jarvis', model: 'gpt-4o' },
   { icon: FileCode, label: 'Code Review', desc: 'Review and optimize', prompt: 'Review this code', endpoint: 'review-code' },
+  { icon: Camera, label: 'AI Studio', desc: 'Professional image generation', prompt: 'Generate an image', endpoint: 'ai-studio', pro: true }
 ]
 
 function App() {
@@ -103,12 +104,27 @@ function App() {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
   const [activeFeature, setActiveFeature] = useState(null)
   const [appError, setAppError] = useState(null)
+  const [showAIStudio, setShowAIStudio] = useState(false)
+  const [studioPrompt, setStudioPrompt] = useState('')
+  const [studioStyle, setStudioStyle] = useState('default')
+  const [studioResolution, setStudioResolution] = useState('1024x1024')
+  const [studioAspectRatio, setStudioAspectRatio] = useState('1:1')
+  const [studioQuality, setStudioQuality] = useState('standard')
+  const [studioNegativePrompt, setStudioNegativePrompt] = useState('')
+  const [studioVisualPrompt, setStudioVisualPrompt] = useState('')
+  const [generatedImage, setGeneratedImage] = useState(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [studioStyles, setStudioStyles] = useState([])
+  const [studioResolutions, setStudioResolutions] = useState([])
+  const [studioAspectRatios, setStudioAspectRatios] = useState([])
+  const [studioQualities, setStudioQualities] = useState([])
 
   useEffect(() => {
     const sid = uuidv4();
     setSessionId(sid);
     loadProPlans();
     checkProStatus();
+    loadStudioConfig();
   }, [])
 
   const loadProPlans = async () => {
@@ -218,6 +234,55 @@ function App() {
     }
   }
 
+  const loadStudioConfig = async () => {
+    try {
+      const res = await fetch('/api/ai-studio/styles');
+      const data = await res.json();
+      setStudioStyles(data.styles || []);
+      setStudioResolutions(data.resolutions || []);
+      setStudioAspectRatios(data.aspectRatios || []);
+      setStudioQualities(data.qualities || []);
+    } catch (e) {
+      console.error('Failed to load studio config', e);
+    }
+  }
+
+  const generateImage = async () => {
+    if (!studioPrompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/ai-studio/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: studioPrompt,
+          style: studioStyle,
+          resolution: studioResolution,
+          aspectRatio: studioAspectRatio,
+          quality: studioQuality,
+          negativePrompt: studioNegativePrompt,
+          visualPrompt: studioVisualPrompt
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setGeneratedImage(data);
+        toast.success('Image generated successfully!');
+      } else {
+        toast.error(data.error || 'Image generation failed');
+      }
+    } catch (e) {
+      toast.error('Image generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -304,6 +369,10 @@ function App() {
         })
         const data = await res.json()
         response = data.review || `Error: ${data.error || 'Code review failed'}`
+      }
+      else if (currentFeature?.endpoint === 'ai-studio') {
+        setShowAIStudio(true)
+        response = 'AI Studio opened. Enter your prompt and click Generate to create images.'
       }
       else {
         const allMessages = [...messages, userMessage].map(m => ({
@@ -480,6 +549,16 @@ function App() {
               </button>
             )}
             
+            {isPro && (
+              <button
+                onClick={() => setShowAIStudio(true)}
+                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+              >
+                <Camera className="w-4 h-4" />
+                AI Studio
+              </button>
+            )}
+            
             <button
               onClick={clearChat}
               className="p-2 hover:bg-nexus-card rounded-lg transition-colors"
@@ -567,6 +646,10 @@ function App() {
                     <div
                       key={i}
                       onClick={() => {
+                        if (feature.pro && !isPro) {
+                          setShowProModal(true)
+                          return
+                        }
                         setInput(feature.prompt)
                         setActiveFeature(feature)
                       }}
@@ -632,9 +715,13 @@ function App() {
                           transition={{ delay: i * 0.05 }}
                           className="feature-card glass rounded-xl p-4 cursor-pointer"
                           onClick={() => {
-                        setInput(feature.prompt)
-                        setActiveFeature(feature)
-                      }}
+                            if (feature.pro && !isPro) {
+                              setShowProModal(true)
+                              return
+                            }
+                            setInput(feature.prompt)
+                            setActiveFeature(feature)
+                          }}
                         >
                           <FeatureIcon className="w-8 h-8 text-nexus-accent mb-3 mx-auto" />
                           <p className="text-sm font-medium text-center">{feature.label}</p>
@@ -1267,6 +1354,195 @@ function App() {
               >
                 Cancel
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Studio Modal */}
+      <AnimatePresence>
+        {showAIStudio && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-nexus-surface border border-nexus-border rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                    <Camera className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">AI Studio</h2>
+                    <p className="text-sm text-gray-400">Professional Image Generation</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAIStudio(false)}
+                  className="p-2 hover:bg-nexus-card rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Controls */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Prompt Engineering *</label>
+                    <textarea
+                      value={studioPrompt}
+                      onChange={(e) => setStudioPrompt(e.target.value)}
+                      placeholder="Describe the image you want to generate..."
+                      className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 transition-colors resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Negative Prompt</label>
+                    <textarea
+                      value={studioNegativePrompt}
+                      onChange={(e) => setStudioNegativePrompt(e.target.value)}
+                      placeholder="What to avoid in the image..."
+                      className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 transition-colors resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Visual Prompt</label>
+                    <input
+                      type="text"
+                      value={studioVisualPrompt}
+                      onChange={(e) => setStudioVisualPrompt(e.target.value)}
+                      placeholder="e.g., DSLR photography, cinematic lighting, 8k"
+                      className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Style Preset</label>
+                      <select
+                        value={studioStyle}
+                        onChange={(e) => setStudioStyle(e.target.value)}
+                        className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 transition-colors"
+                      >
+                        {studioStyles.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Quality</label>
+                      <select
+                        value={studioQuality}
+                        onChange={(e) => setStudioQuality(e.target.value)}
+                        className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 transition-colors"
+                      >
+                        {studioQualities.map(q => (
+                          <option key={q.id} value={q.id}>{q.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>
+                      <select
+                        value={studioAspectRatio}
+                        onChange={(e) => setStudioAspectRatio(e.target.value)}
+                        className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 transition-colors"
+                      >
+                        {studioAspectRatios.map(a => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
+                      <select
+                        value={studioResolution}
+                        onChange={(e) => setStudioResolution(e.target.value)}
+                        className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 transition-colors"
+                      >
+                        {studioResolutions.map(r => (
+                          <option key={r.id} value={r.id}>{r.name} ({r.size})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={generateImage}
+                    disabled={isGenerating || !studioPrompt.trim()}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" />
+                        Generate Image
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Preview */}
+                <div className="flex flex-col">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Preview</label>
+                  <div className="flex-1 bg-nexus-bg border border-nexus-border rounded-xl flex items-center justify-center min-h-[300px]">
+                    {generatedImage ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={generatedImage.imageUrl}
+                          alt="Generated"
+                          className="w-full h-full object-contain rounded-xl"
+                        />
+                        <div className="absolute bottom-4 right-4 flex gap-2">
+                          <a
+                            href={generatedImage.imageUrl}
+                            download="visxuu-ai-studio.png"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-nexus-card border border-nexus-border rounded-lg hover:bg-nexus-border transition-colors"
+                          >
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center p-6">
+                        <Camera className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-500 text-sm">Enter a prompt and click Generate to create an image</p>
+                      </div>
+                    )}
+                  </div>
+                  {generatedImage && (
+                    <div className="mt-3 text-xs text-gray-400 text-center">
+                      Model: {generatedImage.model} | Size: {generatedImage.resolution} | Quality: {generatedImage.quality}
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}

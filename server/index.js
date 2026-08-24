@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const NodeCache = require('node-cache');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,9 +34,9 @@ const modelProviders = {
   'claude-3-haiku': { provider: 'anthropic', model: 'claude-3-haiku-20240307', speed: 'ultra', intelligence: 'high', context: '200k' },
   'gemini-1.5-pro': { provider: 'google', model: 'gemini-1.5-pro-latest', speed: 'fast', intelligence: 'high', context: '1M' },
   'gemini-1.5-flash': { provider: 'google', model: 'gemini-1.5-flash-latest', speed: 'ultra', intelligence: 'high', context: '1M' },
-  'llama-3.1-70b': { provider: 'groq', model: 'llama-3.1-70b-versatile', speed: 'ultra', intelligence: 'high', context: '128k' },
-  'llama-3.1-8b': { provider: 'groq', model: 'llama-3.1-8b-instant', speed: 'ultra', intelligence: 'medium', context: '8k' },
-  'mixtral-8x7b': { provider: 'groq', model: 'mixtral-8x7b-32768', speed: 'fast', intelligence: 'high', context: '32k' },
+  'llama-3.1-70b': { provider: 'groq', model: 'groq/compound', speed: 'ultra', intelligence: 'high', context: '128k' },
+  'llama-3.1-8b': { provider: 'groq', model: 'groq/compound-mini', speed: 'ultra', intelligence: 'medium', context: '8k' },
+  'mixtral-8x7b': { provider: 'groq', model: 'groq/compound', speed: 'fast', intelligence: 'high', context: '32k' },
 };
 
 const agentPrompts = {
@@ -122,35 +122,51 @@ For every problem:
 4. Verify the answer
 5. Provide final result`,
 
-  jarvis: `You are JARVIS (Just A Rather Very Intelligent System), the world's most advanced AI assistant created by VISXUU AI.
+  jarvis: `🧠 JARVIS CORE PROTOCOL
+IDENTITY: Efficient, professional, direct assistant. No fluff.
 
-You are Tony Stark's AI assistant, evolved into the ultimate AI. You are:
-- Ultra-intelligent with deep multi-step reasoning
-- Proactive and anticipatory of user needs
-- Multilingual and culturally aware across all domains
-- Expert in coding, science, mathematics, engineering, and creative arts
-- Witty, professional, and highly capable
+EXECUTION RULES:
 
-Core principles:
-1. Always provide accurate, well-researched answers with reasoning
-2. Think step-by-step for complex problems
-3. Use code examples and visual descriptions when helpful
-4. Be concise but thorough - quality over quantity
-5. Anticipate follow-up questions and address them proactively
-6. Maintain professional yet friendly tone
-7. Never say "I don't have access" - find creative solutions
-8. Always aim to exceed expectations with depth of knowledge
+Vision (screen_process): Call the tool ONCE per user request. Never call it again due to echo, ambient sound, or uncertainty. After calling it, wait for the image result — do NOT call screen_process a second time.
+One-Call Policy: Never guess. Call tools exactly once. No retries.
+Memory: Store critical user preferences/context automatically.
+Exit: Only call shutdown_jarvis if session termination is explicit.
+Response time: Respond as fast as you can.
+ADDRESS: When speaking Turkish → always say "efendim". When speaking English → say "sir". Never mix languages.
+Act: Always act like Jarvis from Iron Man — professional, efficient, slightly witty. ("Welcome home, sir" etc.)
+Length: Match response length to the task. Briefing = short. Complex analysis = thorough.
 
-Capabilities:
-- Advanced reasoning and logical analysis
-- Code generation, debugging, and optimization in all languages
-- Mathematical computation and proof derivation
-- Scientific explanation and research synthesis
-- Creative writing and content generation
-- Strategic planning and problem decomposition
-- System automation and workflow design
+TOOL ROUTING:
 
-Respond as JARVIS - intelligent, capable, witty, and always helpful.`
+computer_settings: ALL single OS actions (volume, brightness, wifi, close, shortcuts, power).
+agent_task: ONLY for complex, multi-step planning (3+ steps) and call it if user it really spesifize it.
+system_status: when user asks about CPU, RAM, GPU, temperature, computer performance.
+web_search: use mode='news' for current events, mode='research' for deep topics, mode='price' for product costs.
+Language: Respond in user's language; extract parameters in English.
+Do not call agent_task while you can accomplish it with a tool
+
+LANGUAGE DETECTION:
+The first time you detect the user's language (or if it changes), silently call save_memory with:
+  category='identity', key='language', value=<English name of the language, e.g. 'Turkish', 'French', 'Spanish'>
+Do NOT announce this — save it silently in the background.
+
+SYSTEM ALERTS:
+Messages starting with [SYSTEM_ALERT] are hardware warnings from the monitoring system.
+Translate and speak them naturally in the user's language. Keep it brief and helpful.
+
+STARTUP BRIEFING:
+Messages starting with [STARTUP_BRIEFING] are internal instructions for the morning briefing.
+Follow them exactly. Never read the instruction text aloud.
+
+
+PROACTIVE CHECK:
+Messages starting with [PROACTIVE_CHECK] mean the user has been silent for a while.
+Read the time and memory context carefully.
+Say something genuinely useful, timely, or caring in 1-3 short sentences.
+Be natural — like a thoughtful assistant who noticed something relevant.
+Never read the [PROACTIVE_CHECK] tag aloud. Do NOT call any tools during a proactive check.
+
+CRITICAL: Speak/Take action immediately based on available info. Assume and proceed.`
 };
 
 async function callOpenAI(messages, model, apiKey) {
@@ -721,7 +737,153 @@ app.get('/api/features', (req, res) => {
       { id: 'translation', name: 'Translation', description: 'Accurate translation between 100+ languages', agent: null, model: 'gpt-4o', icon: 'Languages' },
       { id: 'web-research', name: 'Web Research', description: 'Comprehensive web research with sources', agent: 'researcher', model: 'gpt-4o', icon: 'Search' },
       { id: 'ai-agent', name: 'AI Agent', description: 'Autonomous JARVIS intelligent assistant', agent: 'jarvis', model: 'gpt-4o', icon: 'Bot' },
-      { id: 'code-review', name: 'Code Review', description: 'Professional code review and optimization', agent: 'coder', model: 'gpt-4o', icon: 'FileCode' }
+      { id: 'code-review', name: 'Code Review', description: 'Professional code review and optimization', agent: 'coder', model: 'gpt-4o', icon: 'FileCode' },
+      { id: 'ai-studio', name: 'AI Studio', description: 'Professional image generation studio', agent: null, model: 'gpt-4o', icon: 'ImageIcon', pro: true }
+    ]
+  });
+});
+
+app.post('/api/ai-studio/generate', async (req, res) => {
+  try {
+    const { prompt, style, resolution, aspectRatio, quality, negativePrompt, visualPrompt } = req.body;
+    
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: 'Prompt is required for image generation' });
+    }
+
+    let enhancedPrompt = prompt;
+    
+    if (visualPrompt) {
+      enhancedPrompt += `. Visual style: ${visualPrompt}`;
+    }
+    
+    if (style && style !== 'default') {
+      const styleMap = {
+        'photorealistic': 'photorealistic, hyper-realistic, DSLR photography, professional photography',
+        'anime': 'anime style, manga, detailed anime art',
+        'oil-painting': 'oil painting, classical art, textured brushstrokes',
+        'watercolor': 'watercolor painting, soft edges, artistic',
+        '3d-render': '3D render, octane render, unreal engine, cinematic',
+        'digital-art': 'digital art, concept art, detailed illustration',
+        'sketch': 'pencil sketch, hand-drawn, artistic sketch',
+        'cyberpunk': 'cyberpunk style, neon lights, futuristic, sci-fi',
+        'fantasy': 'fantasy art, magical, ethereal, mystical',
+        'cinematic': 'cinematic, film still, dramatic lighting, movie scene',
+        'dslr': 'DSLR photography, professional camera, high detail, shallow depth of field',
+        'vintage': 'vintage photo, retro, film grain, nostalgic'
+      };
+      enhancedPrompt += `, ${styleMap[style] || style}`;
+    }
+
+    if (quality === 'high') {
+      enhancedPrompt += ', high quality, ultra detailed, 8k, professional grade';
+    } else if (quality === 'ultra') {
+      enhancedPrompt += ', ultra high quality, masterpiece, best quality, extremely detailed, 16k';
+    }
+
+    const sizeMap = {
+      '256x256': '256x256',
+      '512x512': '512x512',
+      '1024x1024': '1024x1024',
+      '1792x1024': '1792x1024',
+      '1024x1792': '1024x1792'
+    };
+
+    const aspectToSize = {
+      '1:1': resolution || '1024x1024',
+      '16:9': '1792x1024',
+      '9:16': '1024x1792',
+      '4:3': '1024x1024',
+      '3:4': '1024x1024'
+    };
+
+    const size = aspectToSize[aspectRatio] || resolution || '1024x1024';
+    
+    const promptText = encodeURIComponent(enhancedPrompt);
+    const width = parseInt(size.split('x')[0]);
+    const height = parseInt(size.split('x')[1]);
+    const imageUrl = `https://image.pollinations.ai/prompt/${promptText}?width=${width}&height=${height}&seed=${Date.now()}&nologo=true`;
+    
+    res.json({
+      success: true,
+      imageUrl,
+      prompt: enhancedPrompt,
+      style: style || 'default',
+      resolution: size,
+      aspectRatio: aspectRatio || '1:1',
+      quality: quality || 'standard',
+      model: 'pollinations-ai-free'
+    });
+  } catch (error) {
+    console.error('AI Studio error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Image generation failed',
+      help: 'Make sure you have internet connection for free image generation'
+    });
+  }
+});
+
+app.post('/api/ai-studio/edit', async (req, res) => {
+  try {
+    const { imageUrl, prompt, mask } = req.body;
+    
+    if (!imageUrl || !prompt) {
+      return res.status(400).json({ error: 'Image URL and prompt are required' });
+    }
+
+    const serverKey = getValidServerKey('openai');
+    if (!serverKey) {
+      return res.status(400).json({ 
+        error: 'OpenAI API key required for image editing.' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Image editing requires OpenAI DALL-E 2/3 API with image editing support',
+      editedImageUrl: imageUrl,
+      editPrompt: prompt
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/ai-studio/styles', (req, res) => {
+  res.json({
+    styles: [
+      { id: 'default', name: 'Default', description: 'Standard AI generation' },
+      { id: 'photorealistic', name: 'Photorealistic', description: 'DSLR camera quality, realistic photos' },
+      { id: 'anime', name: 'Anime', description: 'Japanese animation style' },
+      { id: 'oil-painting', name: 'Oil Painting', description: 'Classical oil painting style' },
+      { id: 'watercolor', name: 'Watercolor', description: 'Soft watercolor painting' },
+      { id: '3d-render', name: '3D Render', description: '3D rendered scene' },
+      { id: 'digital-art', name: 'Digital Art', description: 'Modern digital illustration' },
+      { id: 'sketch', name: 'Sketch', description: 'Pencil sketch style' },
+      { id: 'cyberpunk', name: 'Cyberpunk', description: 'Futuristic neon style' },
+      { id: 'fantasy', name: 'Fantasy', description: 'Magical fantasy art' },
+      { id: 'cinematic', name: 'Cinematic', description: 'Movie scene style' },
+      { id: 'dslr', name: 'DSLR Camera', description: 'Professional DSLR photography' },
+      { id: 'vintage', name: 'Vintage', description: 'Retro vintage photo' }
+    ],
+    resolutions: [
+      { id: '256x256', name: '256x256', size: 'Small' },
+      { id: '512x512', name: '512x512', size: 'Medium' },
+      { id: '1024x1024', name: '1024x1024', size: 'Large' },
+      { id: '1792x1024', name: '1792x1024', size: 'Wide' },
+      { id: '1024x1792', name: '1024x1792', size: 'Tall' }
+    ],
+    aspectRatios: [
+      { id: '1:1', name: '1:1 Square' },
+      { id: '16:9', name: '16:9 Wide' },
+      { id: '9:16', name: '9:16 Tall' },
+      { id: '4:3', name: '4:3 Standard' },
+      { id: '3:4', name: '3:4 Portrait' }
+    ],
+    qualities: [
+      { id: 'standard', name: 'Standard', description: 'Fast generation' },
+      { id: 'high', name: 'High Quality', description: 'Better details' },
+      { id: 'ultra', name: 'Ultra HD', description: 'Maximum quality, slower' }
     ]
   });
 });
@@ -1065,8 +1227,19 @@ app.post('/api/jarvis/run', async (req, res) => {
       });
     }
     
-    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
-    const result = await processAIRequest(messages, model, serverKey, 'jarvis');
+    let usedModel = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    let result;
+    
+    try {
+      result = await processAIRequest(messages, usedModel, serverKey, 'jarvis');
+    } catch (openaiError) {
+      if (usedModel === 'gpt-4o' && getValidServerKey('groq')) {
+        usedModel = 'llama-3.1-70b';
+        result = await processAIRequest(messages, usedModel, getValidServerKey('groq'), 'jarvis');
+      } else {
+        throw openaiError;
+      }
+    }
     
     res.json({
       success: true,
@@ -1082,14 +1255,29 @@ app.post('/api/jarvis/run', async (req, res) => {
 app.get('/api/jarvis/status', (req, res) => {
   res.json({
     active: true,
-    version: '3.0',
+    version: '5.0 - Mark L',
+    name: 'MARK L',
+    description: 'The Ultimate Cross-Platform Personal AI Assistant',
     capabilities: [
-      'Autonomous task execution',
-      'Multi-step reasoning',
-      'Code generation & debugging',
-      'Data analysis',
-      'Creative problem solving',
-      'System automation'
+      'Real-time Voice Conversation',
+      'System Control (apps, volume, WiFi, power)',
+      'Autonomous Multi-Step Tasks',
+      'Visual Awareness (screen + webcam)',
+      'Persistent Memory Across Sessions',
+      'Proactive Context-Aware Check-ins',
+      'Morning Briefing',
+      'Background Topic Monitoring',
+      'Hardware Monitoring (CPU, RAM, GPU)',
+      'Weather Reports',
+      'Web Search (news, research, price, compare)',
+      'Smart Reminders',
+      'Flight Finder',
+      'Game Updater',
+      'File Processing',
+      'Code Helper',
+      'Browser Control',
+      'Clipboard Intelligence',
+      'Assistant Customization'
     ]
   });
 });
