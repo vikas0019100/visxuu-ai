@@ -74,11 +74,10 @@ function App() {
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini')
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [apiKey, setApiKey] = useState('')
   const [showWelcome, setShowWelcome] = useState(true)
   const [copiedId, setCopiedId] = useState(null)
   const [sessionId, setSessionId] = useState(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const docInputRef = useRef(null)
@@ -103,6 +102,7 @@ function App() {
   const [transactionId, setTransactionId] = useState('')
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
   const [activeFeature, setActiveFeature] = useState(null)
+  const [appError, setAppError] = useState(null)
 
   useEffect(() => {
     const sid = uuidv4();
@@ -259,7 +259,6 @@ function App() {
         formData.append('image', uploadedImage)
         formData.append('prompt', currentInput || 'Describe this image in detail')
         formData.append('model', selectedModel)
-        formData.append('apiKey', apiKey)
         
         const res = await fetch('/api/analyze-image', { method: 'POST', body: formData })
         const data = await res.json()
@@ -318,7 +317,6 @@ function App() {
           body: JSON.stringify({
             messages: allMessages,
             model: selectedModel,
-            apiKey: apiKey,
             sessionId: sessionId,
             agentType: currentFeature?.agent || selectedAgent,
           }),
@@ -502,25 +500,11 @@ function App() {
             className="relative z-10 glass border-b border-nexus-border px-6 py-4"
           >
             <div className="max-w-7xl mx-auto">
-              <h3 className="text-sm font-semibold mb-3 text-gray-300">API Configuration</h3>
-              <div className="flex gap-4">
-                <input
-                  type="password"
-                  placeholder="Enter your API key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="flex-1 bg-nexus-card border border-nexus-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-nexus-accent transition-colors"
-                />
-                <button
-                  onClick={() => toast.success('API key saved!')}
-                  className="nexus-gradient text-white px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  Save
-                </button>
+              <h3 className="text-sm font-semibold mb-3 text-gray-300">Server Configuration</h3>
+              <div className="p-4 bg-nexus-card rounded-lg border border-nexus-border">
+                <p className="text-sm text-gray-300 mb-2">API keys are configured on the server.</p>
+                <p className="text-xs text-gray-500">Users do not need to enter API keys. All features work automatically with server-side configuration.</p>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Supports OpenAI, Anthropic, Google, and Groq API keys
-              </p>
             </div>
           </motion.div>
         )}

@@ -32,8 +32,8 @@ const modelProviders = {
   'claude-3.5-sonnet': { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', speed: 'fast', intelligence: 'ultra', context: '200k' },
   'claude-3-opus': { provider: 'anthropic', model: 'claude-3-opus-20240229', speed: 'medium', intelligence: 'ultra', context: '200k' },
   'claude-3-haiku': { provider: 'anthropic', model: 'claude-3-haiku-20240307', speed: 'ultra', intelligence: 'high', context: '200k' },
-  'gemini-1.5-pro': { provider: 'google', model: 'gemini-1.5-pro', speed: 'fast', intelligence: 'high', context: '1M' },
-  'gemini-1.5-flash': { provider: 'google', model: 'gemini-1.5-flash', speed: 'ultra', intelligence: 'high', context: '1M' },
+  'gemini-1.5-pro': { provider: 'google', model: 'gemini-1.5-pro-latest', speed: 'fast', intelligence: 'high', context: '1M' },
+  'gemini-1.5-flash': { provider: 'google', model: 'gemini-1.5-flash-latest', speed: 'ultra', intelligence: 'high', context: '1M' },
   'llama-3.1-70b': { provider: 'groq', model: 'llama-3.1-70b-versatile', speed: 'ultra', intelligence: 'high', context: '128k' },
   'llama-3.1-8b': { provider: 'groq', model: 'llama-3.1-8b-instant', speed: 'ultra', intelligence: 'medium', context: '8k' },
   'mixtral-8x7b': { provider: 'groq', model: 'mixtral-8x7b-32768', speed: 'fast', intelligence: 'high', context: '32k' },
@@ -296,6 +296,19 @@ function getServerApiKey(provider) {
   return keyMap[provider] || null;
 }
 
+function validateApiKey(key, provider) {
+  if (!key || key.length < 10) return false;
+  if (key.includes('your-') || key.includes('here') || key.includes('xxxx')) return false;
+  if (key === 'sk-your-openai-key-here') return false;
+  return true;
+}
+
+function getValidServerKey(provider) {
+  const key = getServerApiKey(provider);
+  if (!validateApiKey(key, provider)) return null;
+  return key;
+}
+
 function generateLicenseKey(email, plan, transactionId) {
   const key = 'VISXUU-' + Math.random().toString(36).substring(2, 10).toUpperCase();
   const expiry = new Date();
@@ -432,21 +445,41 @@ app.post('/api/chat', async (req, res) => {
     }
     
     const provider = modelProviders[model];
-  const serverKey = apiKey || (provider ? getServerApiKey(provider.provider) : null);
-  if (!serverKey) {
-    return res.status(400).json({ 
-      error: 'API key required. Please add valid API keys in server .env file, or enter your own key in settings.',
-      help: 'Server keys not configured. Contact administrator.'
-    });
-  }
+    let serverKey = apiKey;
+    let usedModel = model;
     
-    const cacheKey = `${model}:${JSON.stringify(messages).slice(0, 200)}`;
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return res.json({ ...cached, fromCache: true });
+    if (!serverKey && provider) {
+      serverKey = getValidServerKey(provider.provider);
     }
     
-    const result = await processAIRequest(messages, model, serverKey, agentType);
+    if (!serverKey && provider) {
+      const fallbackProviders = ['groq', 'openai', 'google', 'anthropic'];
+      for (const prov of fallbackProviders) {
+        const key = getValidServerKey(prov);
+        if (key) {
+          serverKey = key;
+          const fallbackModel = Object.entries(modelProviders).find(([k, v]) => v.provider === prov);
+          if (fallbackModel) usedModel = fallbackModel[0];
+          break;
+        }
+      }
+    }
+    
+    if (!serverKey) {
+      return res.status(400).json({ 
+        error: 'No valid API key configured. Please add API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.',
+        availableProviders: Object.keys(modelProviders).map(k => modelProviders[k].provider)
+      });
+    }
+    
+    const cacheKey = `${usedModel}:${JSON.stringify(messages).slice(0, 200)}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({ ...cached, fromCache: true, model: usedModel });
+    }
+    
+    const result = await processAIRequest(messages, usedModel, serverKey, agentType);
     
     if (sessionId) {
       const history = conversationHistory.get(sessionId) || [];
@@ -457,7 +490,7 @@ app.post('/api/chat', async (req, res) => {
     
     cache.set(cacheKey, result);
     
-    res.json(result);
+    res.json({ ...result, model: usedModel });
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ 
@@ -700,9 +733,12 @@ app.post('/api/research', async (req, res) => {
       return res.status(400).json({ error: 'Research query required' });
     }
     
-    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
     if (!serverKey) {
-      return res.status(500).json({ error: 'Server API key not configured' });
+      return res.status(400).json({ 
+        error: 'API key not configured. Please add valid API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.'
+      });
     }
     
     const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
@@ -740,9 +776,12 @@ app.post('/api/translate', async (req, res) => {
       return res.status(400).json({ error: 'Text to translate required' });
     }
     
-    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
     if (!serverKey) {
-      return res.status(500).json({ error: 'Server API key not configured' });
+      return res.status(400).json({ 
+        error: 'API key not configured. Please add valid API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.'
+      });
     }
     
     const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
@@ -779,9 +818,12 @@ app.post('/api/review-code', async (req, res) => {
       return res.status(400).json({ error: 'Code to review required' });
     }
     
-    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
     if (!serverKey) {
-      return res.status(500).json({ error: 'Server API key not configured' });
+      return res.status(400).json({ 
+        error: 'API key not configured. Please add valid API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.'
+      });
     }
     
     const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
@@ -828,10 +870,12 @@ app.post('/api/analyze-document', upload.single('document'), async (req, res) =>
       return res.status(400).json({ error: 'Document file required' });
     }
     
-    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
     if (!serverKey) {
-      fs.unlinkSync(req.file.path);
-      return res.status(500).json({ error: 'Server API key not configured' });
+      return res.status(400).json({ 
+        error: 'API key not configured. Please add valid API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.'
+      });
     }
     
     const mimeType = req.file.mimetype;
@@ -1013,9 +1057,12 @@ app.post('/api/jarvis/run', async (req, res) => {
       ...context
     ];
     
-    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    const serverKey = getValidServerKey('openai') || getValidServerKey('groq');
     if (!serverKey) {
-      return res.status(500).json({ error: 'Server API key not configured' });
+      return res.status(400).json({ 
+        error: 'API key not configured. Please add valid API keys in server .env file.',
+        help: 'Contact administrator to configure server API keys.'
+      });
     }
     
     const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
