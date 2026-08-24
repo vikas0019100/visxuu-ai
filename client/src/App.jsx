@@ -88,7 +88,7 @@ function App() {
   const [showProModal, setShowProModal] = useState(false)
   const [showActivateModal, setShowActivateModal] = useState(false)
   const [licenseKey, setLicenseKey] = useState('')
-  const [selectedPlan, setSelectedPlan] = useState('five_month')
+  const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [plans, setPlans] = useState([])
   const [proStatus, setProStatus] = useState(null)
   const [paymentStatus, setPaymentStatus] = useState(null)
