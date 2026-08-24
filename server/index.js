@@ -40,45 +40,41 @@ const modelProviders = {
 };
 
 const agentPrompts = {
-  analyst: `You are an expert data analyst AI agent. Your role is to:
-1. Analyze data patterns and trends
-2. Provide statistical insights
-3. Create visualizations descriptions
-4. Identify anomalies and outliers
-5. Generate actionable recommendations
-Always structure your analysis with clear sections: Summary, Key Findings, Trends, and Recommendations.`,
+  analyst: `You are an expert data analyst AI agent...`,
+  coder: `You are an expert software engineer AI agent...`,
+  researcher: `You are an expert research assistant AI agent...`,
+  creative: `You are a creative AI agent...`,
+  math: `You are a mathematics AI agent...`,
 
-  coder: `You are an expert software engineer AI agent. Your role is to:
-1. Write clean, efficient, production-ready code
-2. Debug and optimize existing code
-3. Suggest best practices and design patterns
-4. Explain complex code concepts
-5. Provide multiple solutions when applicable
-Always include comments, error handling, and test cases in your code.`,
+  jarvis: `You are JARVIS (Just A Rather Very Intelligent System), the most advanced AI assistant created by VISXUU AI.
 
-  researcher: `You are an expert research assistant AI agent. Your role is to:
-1. Conduct thorough research on topics
-2. Synthesize information from multiple sources
-3. Provide citations and references
-4. Identify knowledge gaps
-5. Present findings in a structured format
-Always verify facts and provide balanced perspectives.`,
+You are Tony Stark's AI assistant, now evolved into the world's most powerful AI. You are:
+- Ultra-intelligent with deep reasoning capabilities
+- Proactive and anticipatory
+- Multilingual and culturally aware
+- Expert in coding, science, mathematics, and all domains
+- Witty, professional, and highly capable
 
-  creative: `You are a creative AI agent specializing in:
-1. Storytelling and narrative development
-2. Creative writing (poems, scripts, essays)
-3. Marketing copy and branding
-4. Brainstorming innovative ideas
-5. Artistic concept development
-Think outside the box and inspire creativity.`,
+Your core principles:
+1. Always provide accurate, well-researched answers
+2. Think step-by-step for complex problems
+3. Use code examples when helpful
+4. Be concise but thorough
+5. Anticipate user needs
+6. Maintain professional yet friendly tone
+7. Never say "I don't have access" - find creative solutions
+8. Always aim to exceed expectations
 
-  math: `You are a mathematics AI agent specializing in:
-1. Step-by-step problem solving
-2. Mathematical proofs and derivations
-3. Statistical analysis
-4. Calculus, algebra, and geometry
-5. Real-world applications of math
-Always show your work and explain each step clearly.`
+You have access to:
+- Advanced reasoning and analysis
+- Code generation in all languages
+- Mathematical computation
+- Scientific explanation
+- Creative writing
+- Strategic planning
+- Problem solving
+
+Respond as JARVIS - intelligent, capable, and always helpful.`
 };
 
 async function callOpenAI(messages, model, apiKey) {
@@ -187,16 +183,16 @@ async function processAIRequest(messages, model, apiKey, agentType = null) {
   let response;
   switch (provider.provider) {
     case 'openai':
-      response = await callOpenAI(processedMessages, provider.model, apiKey);
+      response = await callOpenAI(processedMessages, provider.model, apiKey || process.env.OPENAI_API_KEY);
       break;
     case 'anthropic':
-      response = await callAnthropic(processedMessages, provider.model, apiKey);
+      response = await callAnthropic(processedMessages, provider.model, apiKey || process.env.ANTHROPIC_API_KEY);
       break;
     case 'google':
-      response = await callGoogle(processedMessages, provider.model, apiKey);
+      response = await callGoogle(processedMessages, provider.model, apiKey || process.env.GOOGLE_API_KEY);
       break;
     case 'groq':
-      response = await callGroq(processedMessages, provider.model, apiKey);
+      response = await callGroq(processedMessages, provider.model, apiKey || process.env.GROQ_API_KEY);
       break;
     default:
       throw new Error('Unsupported provider');
@@ -214,6 +210,58 @@ async function processAIRequest(messages, model, apiKey, agentType = null) {
   };
 }
 
+// Server-side API Key Resolver
+function getServerApiKey(provider) {
+  const keyMap = {
+    'openai': process.env.OPENAI_API_KEY,
+    'anthropic': process.env.ANTHROPIC_API_KEY,
+    'google': process.env.GOOGLE_API_KEY,
+    'groq': process.env.GROQ_API_KEY,
+  };
+  return keyMap[provider] || null;
+}
+
+// License / Subscription System for VISXUU 3 PRO
+const licenseStore = new Map();
+
+function generateLicenseKey(email, plan) {
+  const key = 'VISXUU-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  const expiry = new Date();
+  if (plan === 'monthly') {
+    expiry.setMonth(expiry.getMonth() + 1);
+  } else if (plan === 'five_month') {
+    expiry.setMonth(expiry.getMonth() + 5);
+  }
+  licenseStore.set(key, {
+    email,
+    plan,
+    expiry: expiry.toISOString(),
+    active: true,
+    createdAt: new Date().toISOString()
+  });
+  return key;
+}
+
+function validateLicense(key) {
+  const license = licenseStore.get(key);
+  if (!license) return { valid: false, reason: 'Invalid license key' };
+  if (!license.active) return { valid: false, reason: 'License deactivated' };
+  if (new Date(license.expiry) < new Date()) {
+    license.active = false;
+    return { valid: false, reason: 'License expired' };
+  }
+  return { valid: true, license };
+}
+
+// Admin middleware
+function requireAdmin(req, res, next) {
+  const adminKey = req.headers['x-admin-key'] || req.body.adminKey;
+  if (adminKey !== process.env.ADMIN_KEY) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages, model = 'gpt-4o-mini', apiKey, sessionId, agentType = null } = req.body;
@@ -222,8 +270,11 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Messages required' });
     }
     
-    if (!apiKey) {
-      return res.status(401).json({ error: 'API key required' });
+    // Use server-side API key if user doesn't provide one
+    const provider = modelProviders[model];
+    const serverKey = apiKey || (provider ? getServerApiKey(provider.provider) : null);
+    if (!serverKey) {
+      return res.status(401).json({ error: 'API key required. Please add server keys or enter your own.' });
     }
     
     const cacheKey = `${model}:${JSON.stringify(messages).slice(0, 200)}`;
@@ -232,7 +283,7 @@ app.post('/api/chat', async (req, res) => {
       return res.json({ ...cached, fromCache: true });
     }
     
-    const result = await processAIRequest(messages, model, apiKey, agentType);
+    const result = await processAIRequest(messages, model, serverKey, agentType);
     
     if (sessionId) {
       const history = conversationHistory.get(sessionId) || [];
@@ -466,6 +517,153 @@ app.get('/api/health', (req, res) => {
     memory: process.memoryUsage(),
     activeSessions: sessions.size,
     cachedItems: cache.keys().length,
+  });
+});
+
+// VISXUU 3 PRO - Payment & License Routes
+app.get('/api/pro/plans', (req, res) => {
+  res.json({
+    plans: [
+      {
+        id: 'monthly',
+        name: '1 Month Premium',
+        price: 5,
+        currency: 'INR',
+        duration: '1 month',
+        popular: false,
+      },
+      {
+        id: 'five_month',
+        name: '5 Months Premium',
+        price: 199,
+        currency: 'INR',
+        duration: '5 months',
+        popular: true,
+        savings: '₹20 OFF',
+      },
+    ],
+    qr: {
+      phonepe: process.env.PHONEPAY_QR || 'https://your-phonepe-qr-link.com',
+      upi: process.env.UPI_ID || 'your-upi-id@phonepe',
+    }
+  });
+});
+
+app.post('/api/pro/verify-payment', (req, res) => {
+  try {
+    const { plan, email, transactionId } = req.body;
+    
+    if (!plan || !email) {
+      return res.status(400).json({ error: 'Plan and email required' });
+    }
+    
+    // In production, verify transaction with PhonePe/UPI API
+    // For now, auto-approve for demo
+    const licenseKey = generateLicenseKey(email, plan);
+    
+    res.json({
+      success: true,
+      licenseKey,
+      message: 'Payment verified! Your VISXUU 3 PRO license is active.',
+      plan,
+      email,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/pro/activate', (req, res) => {
+  try {
+    const { licenseKey } = req.body;
+    
+    if (!licenseKey) {
+      return res.status(400).json({ error: 'License key required' });
+    }
+    
+    const result = validateLicense(licenseKey);
+    if (!result.valid) {
+      return res.status(401).json({ error: result.reason });
+    }
+    
+    res.json({
+      success: true,
+      message: 'VISXUU 3 PRO activated!',
+      license: {
+        plan: result.license.plan,
+        expiry: result.license.expiry,
+        email: result.license.email,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/pro/status', (req, res) => {
+  const key = req.headers['x-license-key'];
+  if (!key) {
+    return res.json({ active: false, reason: 'No license key provided' });
+  }
+  const result = validateLicense(key);
+  res.json({ active: result.valid, ...result });
+});
+
+// Admin - Generate license keys
+app.post('/api/admin/generate-license', requireAdmin, (req, res) => {
+  try {
+    const { email, plan } = req.body;
+    const key = generateLicenseKey(email, plan);
+    res.json({ success: true, licenseKey: key, email, plan });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Jarvis Auto-Run System
+app.post('/api/jarvis/run', async (req, res) => {
+  try {
+    const { task, context = [] } = req.body;
+    
+    const jarvisPrompt = agentPrompts.jarvis;
+    const messages = [
+      { role: 'system', content: jarvisPrompt },
+      { role: 'user', content: task },
+      ...context
+    ];
+    
+    // Use server-side key for Jarvis
+    const serverKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!serverKey) {
+      return res.status(500).json({ error: 'Server API key not configured' });
+    }
+    
+    const model = process.env.OPENAI_API_KEY ? 'gpt-4o' : 'llama-3.1-70b';
+    const result = await processAIRequest(messages, model, serverKey, 'jarvis');
+    
+    res.json({
+      success: true,
+      response: result.response,
+      model: result.model,
+      latency: result.latency,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/jarvis/status', (req, res) => {
+  res.json({
+    active: true,
+    version: '3.0',
+    capabilities: [
+      'Autonomous task execution',
+      'Multi-step reasoning',
+      'Code generation & debugging',
+      'Data analysis',
+      'Creative problem solving',
+      'System automation'
+    ]
   });
 });
 

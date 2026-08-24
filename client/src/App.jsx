@@ -51,6 +51,7 @@ const AGENTS = {
   researcher: { name: 'Researcher', icon: BookOpen, desc: 'Deep research and analysis' },
   creative: { name: 'Creative Writer', icon: Palette, desc: 'Creative content and stories' },
   math: { name: 'Math Expert', icon: Calculator, desc: 'Math and logic problems' },
+  jarvis: { name: 'JARVIS AI', icon: Bot, desc: 'Autonomous intelligent assistant', pro: true },
 }
 
 const FEATURES = [
@@ -81,11 +82,94 @@ function App() {
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const [uploadedImage, setUploadedImage] = useState(null)
+  
+  // VISXUU 3 PRO state
+  const [isPro, setIsPro] = useState(false)
+  const [showProModal, setShowProModal] = useState(false)
+  const [showActivateModal, setShowActivateModal] = useState(false)
+  const [licenseKey, setLicenseKey] = useState('')
+  const [selectedPlan, setSelectedPlan] = useState('five_month')
+  const [plans, setPlans] = useState([])
+  const [proStatus, setProStatus] = useState(null)
 
   useEffect(() => {
     const sid = uuidv4();
     setSessionId(sid);
+    loadProPlans();
+    checkProStatus();
   }, [])
+
+  const loadProPlans = async () => {
+    try {
+      const res = await fetch('/api/pro/plans');
+      const data = await res.json();
+      setPlans(data.plans);
+    } catch (e) {
+      console.error('Failed to load plans', e);
+    }
+  }
+
+  const checkProStatus = async () => {
+    try {
+      const key = localStorage.getItem('visxuu_license_key');
+      if (!key) return;
+      const res = await fetch('/api/pro/status', {
+        headers: { 'X-License-Key': key }
+      });
+      const data = await res.json();
+      if (data.active) {
+        setIsPro(true);
+        setProStatus(data);
+      }
+    } catch (e) {
+      console.error('Failed to check pro status', e);
+    }
+  }
+
+  const handlePayment = async (plan) => {
+    try {
+      const res = await fetch('/api/pro/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan,
+          email: 'user@visxuu.ai',
+          transactionId: 'DEMO-' + Date.now()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('visxuu_license_key', data.licenseKey);
+        setIsPro(true);
+        setShowProModal(false);
+        toast.success('VISXUU 3 PRO activated!');
+      }
+    } catch (e) {
+      toast.error('Payment failed');
+    }
+  }
+
+  const activateLicense = async () => {
+    try {
+      const res = await fetch('/api/pro/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('visxuu_license_key', licenseKey);
+        setIsPro(true);
+        setShowActivateModal(false);
+        setLicenseKey('');
+        toast.success('VISXUU 3 PRO activated!');
+      } else {
+        toast.error(data.error);
+      }
+    } catch (e) {
+      toast.error('Activation failed');
+    }
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -93,12 +177,6 @@ function App() {
 
   const sendMessage = async () => {
     if (!input.trim() && !uploadedImage) return
-    
-    if (!apiKey) {
-      toast.error('Please enter your API key in settings')
-      setShowSettings(true)
-      return
-    }
 
     const userMessage = { 
       id: Date.now(), 
@@ -256,6 +334,21 @@ function App() {
             >
               <Settings className="w-5 h-5 text-gray-400" />
             </button>
+            
+            {!isPro ? (
+              <button
+                onClick={() => setShowProModal(true)}
+                className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+              >
+                <Sparkles className="w-4 h-4" />
+                VISXUU 3 PRO
+              </button>
+            ) : (
+              <div className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-lg text-sm font-bold flex items-center gap-1">
+                <Sparkles className="w-4 h-4" />
+                PRO ACTIVE
+              </div>
+            )}
             
             <button
               onClick={clearChat}
@@ -604,6 +697,173 @@ function App() {
           </div>
         </main>
       </div>
+
+      {/* VISXUU 3 PRO Modal */}
+      <AnimatePresence>
+        {showProModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-nexus-surface border border-nexus-border rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                  VISXUU 3 PRO
+                </h2>
+                <p className="text-gray-400">Unlock the full power of VISXUU AI</p>
+              </div>
+
+              {/* Plans */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {plans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    onClick={() => setSelectedPlan(plan.id)}
+                    className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all ${
+                      selectedPlan === plan.id
+                        ? 'border-yellow-400 bg-yellow-400/10'
+                        : 'border-nexus-border hover:border-gray-600'
+                    }`}
+                  >
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-3 py-1 rounded-full font-bold">
+                        MOST POPULAR
+                      </div>
+                    )}
+                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-3xl font-bold text-yellow-400">₹{plan.price}</span>
+                      <span className="text-gray-400 text-sm">/{plan.duration}</span>
+                    </div>
+                    {plan.savings && (
+                      <p className="text-green-400 text-sm font-medium">{plan.savings}</p>
+                    )}
+                    <ul className="mt-4 space-y-2 text-sm text-gray-300">
+                      <li>✓ Unlimited JARVIS AI access</li>
+                      <li>✓ All 11 AI models</li>
+                      <li>✓ Priority support</li>
+                      <li>✓ No ads</li>
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              {/* QR Code Section */}
+              <div className="bg-nexus-bg rounded-xl p-6 mb-6">
+                <h3 className="text-center font-semibold mb-4">Scan to Pay</h3>
+                <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+                  <div className="text-center">
+                    <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
+                      <img
+                        src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas0019100@phonepe&pn=VISXUU+AI&am=5&cu=INR"
+                        alt="PhonePe QR"
+                        className="w-40 h-40"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-400">PhonePe / UPI</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
+                      <img
+                        src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://visxuu-ai.onrender.com"
+                        alt="VISXUU AI"
+                        className="w-40 h-40"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-400">VISXUU AI</p>
+                  </div>
+                </div>
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-400">
+                    UPI ID: <span className="text-white font-mono">vikas0019100@phonepe</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pay ₹{selectedPlan === 'monthly' ? '5' : '199'} and click below
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handlePayment(selectedPlan)}
+                  className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity"
+                >
+                  I've Paid - Activate Now
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProModal(false);
+                    setShowActivateModal(true);
+                  }}
+                  className="px-6 py-3 border border-nexus-border rounded-xl hover:bg-nexus-card transition-colors"
+                >
+                  Have License Key?
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowProModal(false)}
+                className="w-full mt-4 text-gray-400 hover:text-white transition-colors"
+              >
+                Maybe Later
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* License Activation Modal */}
+      <AnimatePresence>
+        {showActivateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-nexus-surface border border-nexus-border rounded-2xl p-8 max-w-md w-full"
+            >
+              <h2 className="text-2xl font-bold mb-2 text-center">Activate VISXUU 3 PRO</h2>
+              <p className="text-gray-400 text-center mb-6">Enter your license key</p>
+              
+              <input
+                type="text"
+                placeholder="VISXUU-XXXXXXXXXX"
+                value={licenseKey}
+                onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
+                className="w-full bg-nexus-bg border border-nexus-border rounded-xl px-4 py-3 text-center font-mono text-lg tracking-wider focus:outline-none focus:border-yellow-400 transition-colors mb-4"
+              />
+              
+              <button
+                onClick={activateLicense}
+                disabled={!licenseKey}
+                className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                Activate License
+              </button>
+              
+              <button
+                onClick={() => setShowActivateModal(false)}
+                className="w-full mt-3 text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
