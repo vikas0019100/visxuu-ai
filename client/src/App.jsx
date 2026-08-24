@@ -218,12 +218,12 @@ function App() {
   const sendMessage = async () => {
     if (!input.trim() && !uploadedImage && !uploadedDocument) return
 
-    const currentInput = input
+    const currentInput = input.trim()
     const currentFeature = activeFeature
 
     setActiveFeature(null)
     
-    if (!currentInput.trim() && !uploadedImage && !uploadedDocument) return
+    if (!currentInput && !uploadedImage && !uploadedDocument) return
 
     const userMessage = { 
       id: Date.now(), 
@@ -242,79 +242,64 @@ function App() {
     setShowWelcome(false)
 
     try {
-      let response
+      let response = ''
+      let responseModel = selectedModel
+      let responseAgent = selectedAgent
+      let responseLatency
       
-      // Handle specific feature endpoints
-      if (currentFeature?.endpoint === 'analyze-image' && uploadedImage) {
+      if (uploadedImage) {
         const formData = new FormData()
         formData.append('image', uploadedImage)
         formData.append('prompt', currentInput || 'Describe this image in detail')
         formData.append('model', selectedModel)
         formData.append('apiKey', apiKey)
         
-        const res = await fetch('/api/analyze-image', {
-          method: 'POST',
-          body: formData,
-        })
+        const res = await fetch('/api/analyze-image', { method: 'POST', body: formData })
         const data = await res.json()
-        response = data.response || `Error: ${data.error || 'Unknown error'}`
+        response = data.response || `Error: ${data.error || 'Image analysis failed'}`
       } 
-      else if (currentFeature?.endpoint === 'analyze-document' && uploadedDocument) {
+      else if (uploadedDocument) {
         const formData = new FormData()
         formData.append('document', uploadedDocument)
         formData.append('prompt', documentPrompt)
         formData.append('model', selectedModel)
         
-        const res = await fetch('/api/analyze-document', {
-          method: 'POST',
-          body: formData,
-        })
+        const res = await fetch('/api/analyze-document', { method: 'POST', body: formData })
         const data = await res.json()
         if (data.success) {
-          response = `📄 **Document Analysis Complete**\n\n**File:** ${data.fileName}\n**Type:** ${data.fileType}\n**Length:** ${data.textLength} characters\n\n**Analysis:**\n${data.analysis}`
+          response = `Document Analysis Complete\n\nFile: ${data.fileName}\nType: ${data.fileType}\nLength: ${data.textLength} characters\n\nAnalysis:\n${data.analysis}`
         } else {
-          response = `Error: ${data.error || 'Unknown error'}`
+          response = `Error: ${data.error || 'Document analysis failed'}`
         }
       }
       else if (currentFeature?.endpoint === 'research') {
         const res = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: currentInput,
-            depth: researchDepth
-          }),
+          body: JSON.stringify({ query: currentInput, depth: researchDepth }),
         })
         const data = await res.json()
-        response = data.report || `Error: ${data.error || 'Unknown error'}`
+        response = data.report || `Error: ${data.error || 'Research failed'}`
       }
       else if (currentFeature?.endpoint === 'translate') {
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: currentInput,
-            from: translateFrom,
-            to: translateTo
-          }),
+          body: JSON.stringify({ text: currentInput, from: translateFrom, to: translateTo }),
         })
         const data = await res.json()
-        response = data.translatedText || `Error: ${data.error || 'Unknown error'}`
+        response = data.translatedText || `Error: ${data.error || 'Translation failed'}`
       }
       else if (currentFeature?.endpoint === 'review-code') {
         const res = await fetch('/api/review-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: currentInput,
-            language: codeLanguage
-          }),
+          body: JSON.stringify({ code: currentInput, language: codeLanguage }),
         })
         const data = await res.json()
-        response = data.review || `Error: ${data.error || 'Unknown error'}`
+        response = data.review || `Error: ${data.error || 'Code review failed'}`
       }
       else {
-        // Normal chat
         const allMessages = [...messages, userMessage].map(m => ({
           role: m.role,
           content: m.content
@@ -332,33 +317,32 @@ function App() {
           }),
         })
         
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ error: 'Network error' }))
-          throw new Error(errorData.error || `HTTP ${res.status}`)
-        }
-        
         const data = await res.json()
-        response = data.response || `Error: ${data.error || 'Unknown error'}`
+        response = data.response || `Error: ${data.error || 'Chat failed'}`
+        responseModel = data.model || selectedModel
+        responseAgent = currentFeature?.agent || selectedAgent
+        responseLatency = data.latency
       }
       
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
         content: response,
-        model: selectedModel,
-        agent: currentFeature?.agent || selectedAgent,
-        latency: data?.latency,
+        model: responseModel,
+        agent: responseAgent,
+        latency: responseLatency,
         timestamp: new Date().toLocaleTimeString()
       }])
     } catch (error) {
-      toast.error('Failed to send message')
-      console.error(error)
+      const errorMessage = error?.message || 'Something went wrong. Please try again.'
+      toast.error(errorMessage)
+      console.error('Send message error:', error)
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
-        content: `⚠️ **Error:** ${error.message || 'Something went wrong. Please try again.'}`,
+        content: `Error: ${errorMessage}`,
         model: selectedModel,
-        agent: currentFeature?.agent || selectedAgent,
+        agent: selectedAgent,
         timestamp: new Date().toLocaleTimeString()
       }])
     } finally {
