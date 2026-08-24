@@ -578,7 +578,144 @@ function App() {
                                         >
                                           {copiedId === message.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                         </button>
-                                      </div>
+              </div>
+
+              {/* What You Get Section */}
+              <div className="bg-nexus-bg rounded-xl p-6 mb-6">
+                <h3 className="text-center font-semibold mb-4 text-lg">🚀 What You Get in VISXUU 3 PRO</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-yellow-400 text-lg">🤖</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Unlimited JARVIS AI</h4>
+                        <p className="text-xs text-gray-400">Autonomous intelligent assistant 24/7</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-blue-400 text-lg">🧠</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">11 Premium AI Models</h4>
+                        <p className="text-xs text-gray-400">GPT-4o, Claude 3.5, Gemini, Llama 3.1 & more</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-purple-400 text-lg">⚡</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Lightning Fast Responses</h4>
+                        <p className="text-xs text-gray-400">Ultra-low latency with priority servers</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-green-400 text-lg">💻</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Unlimited Code Generation</h4>
+                        <p className="text-xs text-gray-400">All languages with syntax highlighting</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-pink-400 text-lg">🎨</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Vision & Image Analysis</h4>
+                        <p className="text-xs text-gray-400">Upload any image, get instant analysis</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-orange-400 text-lg">🎙️</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Voice Chat & TTS</h4>
+                        <p className="text-xs text-gray-400">Speak to AI, get voice responses</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-cyan-400 text-lg">🌐</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Web Research Agent</h4>
+                        <p className="text-xs text-gray-400">Real-time information from the web</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-red-400 text-lg">📊</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Advanced Data Analysis</h4>
+                        <p className="text-xs text-gray-400">Patterns, trends & insights</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-indigo-400 text-lg">🔬</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">5 AI Agents</h4>
+                        <p className="text-xs text-gray-400">Analyst, Coder, Researcher, Creative, Math</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-teal-400 text-lg">💬</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Unlimited Messages</h4>
+                        <p className="text-xs text-gray-400">No daily limits, chat as much as you want</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-amber-400 text-lg">🔒</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Priority Support</h4>
+                        <p className="text-xs text-gray-400">24/7 dedicated support team</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-emerald-400 text-lg">🚫</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">No Ads Ever</h4>
+                        <p className="text-xs text-gray-400">100% ad-free experience</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Highlight Box */}
+                <div className="mt-6 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl">
+                  <p className="text-sm text-center text-yellow-400 font-medium">
+                    ✨ All features included in both plans. No hidden charges. Cancel anytime.
+                  </p>
+                </div>
+              </div>
                                       <SyntaxHighlighter
                                         style={vscDarkPlus}
                                         language={match[1]}
