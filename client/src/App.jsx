@@ -123,26 +123,33 @@ function App() {
 
   const checkProStatus = async () => {
     try {
-      const key = localStorage.getItem('visxuu_license_key');
-      if (!key) {
-        setPlans(prev => prev.filter(p => p.id === 'monthly'));
-        return;
+      let key = null
+      try {
+        key = localStorage.getItem('visxuu_license_key')
+      } catch (e) {
+        console.warn('localStorage not available')
       }
+      
+      if (!key) {
+        setPlans(prev => prev.filter(p => p.id === 'monthly'))
+        return
+      }
+      
       const res = await fetch('/api/pro/status', {
         headers: { 'X-License-Key': key }
-      });
-      const data = await res.json();
+      })
+      const data = await res.json()
       if (data.active) {
-        setIsPro(true);
-        setProStatus(data);
+        setIsPro(true)
+        setProStatus(data)
       } else if (data.wasActive) {
-        setPlans(prev => prev.filter(p => p.id === 'five_month'));
-        setSelectedPlan('five_month');
+        setPlans(prev => prev.filter(p => p.id === 'five_month'))
+        setSelectedPlan('five_month')
       } else {
-        setPlans(prev => prev.filter(p => p.id === 'monthly'));
+        setPlans(prev => prev.filter(p => p.id === 'monthly'))
       }
     } catch (e) {
-      console.error('Failed to check pro status', e);
+      console.error('Failed to check pro status', e)
     }
   }
 
@@ -167,8 +174,8 @@ function App() {
       const data = await res.json();
       
       if (data.success) {
-        localStorage.setItem('visxuu_license_key', data.licenseKey);
-        setIsPro(true);
+        try { localStorage.setItem('visxuu_license_key', data.licenseKey) } catch (e) {}
+        setIsPro(true)
         setShowProModal(false);
         setPaymentStatus(null);
         setTransactionId('');
@@ -198,8 +205,8 @@ function App() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem('visxuu_license_key', licenseKey);
-        setIsPro(true);
+        try { localStorage.setItem('visxuu_license_key', licenseKey) } catch (e) {}
+        setIsPro(true)
         setShowActivateModal(false);
         setLicenseKey('');
         toast.success('VISXUU 3 PRO activated!');
