@@ -24,7 +24,9 @@ import {
   Search,
   FileCode,
   BarChart3,
-  BookOpen
+  BookOpen,
+  Menu,
+  Home
 } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import ReactMarkdown from 'react-markdown'
@@ -590,7 +592,7 @@ function App() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative z-10">
+      <div className="flex-1 flex overflow-hidden relative z-10 pb-14 md:pb-0">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -1547,6 +1549,67 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass border-t border-nexus-border px-2 py-1">
+        <div className="flex items-center justify-around">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex flex-col items-center gap-0.5 p-2 text-gray-400 hover:text-white transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+            <span className="text-[10px]">Menu</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setInput('')
+              setActiveFeature(null)
+              setShowWelcome(true)
+            }}
+            className="flex flex-col items-center gap-0.5 p-2 text-gray-400 hover:text-white transition-colors"
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-[10px]">Home</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              if (isPro) {
+                setShowAIStudio(true)
+              } else {
+                setShowProModal(true)
+              }
+            }}
+            className="flex flex-col items-center gap-0.5 p-2 text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            <Camera className="w-5 h-5" />
+            <span className="text-[10px]">AI Studio</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setInput('Help me with this task autonomously')
+              setActiveFeature(FEATURES.find(f => f.agent === 'jarvis'))
+            }}
+            className="flex flex-col items-center gap-0.5 p-2 text-nexus-accent hover:text-nexus-accent/80 transition-colors"
+          >
+            <Bot className="w-5 h-5" />
+            <span className="text-[10px]">JARVIS</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setInput('Write code for')
+              setActiveFeature(FEATURES.find(f => f.agent === 'coder'))
+            }}
+            className="flex flex-col items-center gap-0.5 p-2 text-nexus-accent2 hover:text-nexus-accent2/80 transition-colors"
+          >
+            <Code2 className="w-5 h-5" />
+            <span className="text-[10px]">Code</span>
+          </button>
+        </div>
+      </nav>
     </div>
   )
 }
