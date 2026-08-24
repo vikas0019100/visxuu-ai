@@ -2,7 +2,7 @@
   "name": "visxuu-ai",
   "version": "1.0.0",
   "private": true,
-  "description": "VISXUU AI - Beyond Intelligence. Advanced multi-model AI platform.",
+  "description": "VISXUU AI - Advanced Multi-Model AI Platform with VISXUU 3 PRO",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",
@@ -22,9 +22,7 @@
     "openai": "^4.20.0",
     "@anthropic-ai/sdk": "^0.10.0",
     "@google/generative-ai": "^0.2.0",
-    "node-cache": "^5.1.2"
-  },
-  "devDependencies": {
+    "node-cache": "^5.1.2",
     "concurrently": "^8.2.2"
-  }
-}
+  },
+  "devDependencies": {}
