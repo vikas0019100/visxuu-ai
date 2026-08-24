@@ -459,6 +459,22 @@ function App() {
               </div>
             )}
             
+            {activeFeature && (
+              <button
+                onClick={() => {
+                  setActiveFeature(null)
+                  setInput('')
+                  toast.success('Back to normal chat')
+                }}
+                className="px-4 py-2 bg-nexus-card border border-nexus-border text-white rounded-lg text-sm font-medium hover:bg-nexus-border transition-colors flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Chat
+              </button>
+            )}
+            
             <button
               onClick={clearChat}
               className="p-2 hover:bg-nexus-card rounded-lg transition-colors"
@@ -905,11 +921,31 @@ function App() {
               
               <div className="flex gap-3">
                 <div className="flex-1 relative">
+                  {activeFeature && (
+                    <div className="absolute -top-8 left-0 flex items-center gap-2">
+                      <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-3 py-1 flex items-center gap-2">
+                        {(() => {
+                          const IconComp = activeFeature.icon
+                          return <IconComp className="w-4 h-4 text-yellow-400" />
+                        })()}
+                        <span className="text-xs text-yellow-400 font-medium">{activeFeature.label} Mode</span>
+                        <button
+                          onClick={() => {
+                            setActiveFeature(null)
+                            setInput('')
+                          }}
+                          className="text-yellow-400 hover:text-white transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Message VISXUU AI..."
+                    placeholder={activeFeature ? `${activeFeature.label}: ${activeFeature.prompt}` : 'Message VISXUU AI...'}
                     className="w-full bg-nexus-card border border-nexus-border rounded-xl px-4 py-3 pr-24 focus:outline-none focus:border-nexus-accent transition-colors resize-none"
                     rows={1}
                     style={{ minHeight: '48px', maxHeight: '200px' }}
