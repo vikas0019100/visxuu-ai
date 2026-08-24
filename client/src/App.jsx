@@ -113,7 +113,6 @@ function App() {
     try {
       const key = localStorage.getItem('visxuu_license_key');
       if (!key) {
-        // No license = first time user, show only ₹5 plan
         setPlans(prev => prev.filter(p => p.id === 'monthly'));
         return;
       }
@@ -124,11 +123,10 @@ function App() {
       if (data.active) {
         setIsPro(true);
         setProStatus(data);
-      } else if (data.isFirstTime === false && data.wasActive) {
-        // User had PRO before, expired now - show both plans
-        setPlans(prev => prev);
+      } else if (data.wasActive) {
+        setPlans(prev => prev.filter(p => p.id === 'five_month'));
+        setSelectedPlan('five_month');
       } else {
-        // First time user or never had PRO - show only ₹5
         setPlans(prev => prev.filter(p => p.id === 'monthly'));
       }
     } catch (e) {
@@ -774,8 +772,8 @@ function App() {
                   <div className="text-center">
                     <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center mb-2 mx-auto">
                       <img
-                        src={selectedPlan === 'monthly' ? '/qr/visxuu-monthly.png' : '/qr/visxuu-five_month.png'}
-                        alt="Payment QR"
+                        src="/qr/phonepe-qr.png"
+                        alt="PhonePe QR"
                         className="w-40 h-40"
                       />
                     </div>
@@ -796,7 +794,7 @@ function App() {
                 </div>
                 <div className="mt-4 text-center">
                   <p className="text-sm text-gray-400">
-                    UPI ID: <span className="text-white font-mono">vikas0019100@phonepe</span>
+                    UPI ID: <span className="text-white font-mono">7300402985@naviaxis</span>
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Amount: ₹{selectedPlan === 'monthly' ? '5' : '199'} | Plan: {selectedPlan === 'monthly' ? '1 Month' : '5 Months Premium'}
